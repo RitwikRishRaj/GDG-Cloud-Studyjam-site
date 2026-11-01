@@ -5,19 +5,17 @@ import { cookies } from "next/headers";
 const SESSION_COOKIE = "gdg_admin_session";
 const SESSION_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
 
-function getSecret(): string {
-  return (
-    process.env.ADMIN_SESSION_SECRET ||
-    "gdg-studyjam-local-session-secret-2026"
-  );
+function getSecret(): string | null {
+  return process.env.ADMIN_SESSION_SECRET || null;
 }
 
-export function getAdminPassword(): string {
-  return process.env.ADMIN_PASSWORD || "gdg-admin-2026";
+export function getAdminPassword(): string | null {
+  return process.env.ADMIN_PASSWORD || null;
 }
 
 export function verifyPassword(password: string): boolean {
   const expected = getAdminPassword();
+  if (!expected || !getSecret()) return false;
   const a = Buffer.from(password.padEnd(64).slice(0, 64));
   const b = Buffer.from(expected.padEnd(64).slice(0, 64));
   return crypto.timingSafeEqual(a, b);
@@ -28,13 +26,16 @@ function sign(payload: string): string {
 }
 
 export function createSessionValue(): string {
+  if (!getAdminPassword() || !getSecret()) {
+    throw new Error("Admin credentials are not configured.");
+  }
   const expiry = Date.now() + SESSION_TTL_MS;
   const payload = `admin.${expiry}`;
   return `${payload}.${sign(payload)}`;
 }
 
 export function verifySessionValue(value: string | undefined | null): boolean {
-  if (!value) return false;
+  if (!value || !getAdminPassword() || !getSecret()) return false;
   const parts = value.split(".");
   if (parts.length !== 3) return false;
   const [role, expiryStr, signature] = parts;
