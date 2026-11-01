@@ -51,10 +51,10 @@ export function StudyMasthead({ page }: StudyMastheadProps) {
           >
             Syllabus
           </a>
-          <a href="#registration">
+          <Link href="/#milestone-board">
             <ClipboardList aria-hidden="true" />
-            How to register
-          </a>
+            Milestone Board
+          </Link>
           <a href="#help">
             <MessageCircle aria-hidden="true" />
             WhatsApp
@@ -63,8 +63,8 @@ export function StudyMasthead({ page }: StudyMastheadProps) {
       ) : (
         <nav className="study-nav" aria-label="Main navigation">
           <Link href="/">Home</Link>
-          <Link href="/leaderboard" aria-current="page">
-            Leaderboard
+          <Link href="/#milestone-board" aria-current="page">
+            Milestone Board
           </Link>
           <Link href="/admin">Admin</Link>
         </nav>

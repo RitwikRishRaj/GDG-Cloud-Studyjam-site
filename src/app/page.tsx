@@ -8,7 +8,7 @@ import milestoneStyles from "@/components/milestone-board.module.css";
 import { getMilestoneData } from "@/lib/milestone-data";
 import { CAMPAIGN_DEADLINE } from "@/lib/campaign";
 
-const formUrl = "https://docs.google.com/forms/d/e/1FAIpQLScIxD14Pyc183PbDLHcS9N-nbQRRYSncqY0TP3g7qSsfWgnKQ/viewform";
+
 const syllabusUrl = "https://goo.gle/lwc-student-curriculum";
 const guideUrl = "https://docs.google.com/document/d/1_V1v-Ii9QBzF9bTK_InE4670H12n5Te36DTjuEoz9gs/edit?tab=t.0#heading=h.e1a2o8y6pljb";
 const whatsappUrl = "https://chat.whatsapp.com/CHeebKrkCyv89bXo64vBS3";
@@ -42,10 +42,9 @@ export default async function HomePage() {
             <p className="study-lead">Do free, hands-on Google Cloud labs on Google Skills. <strong>5 skill badges</strong> get you a Google Cloud water bottle. <strong>10</strong> unlock an exclusive developer kit with a T-shirt. Every badge also goes on your resume and LinkedIn.</p>
             <div className="study-actions">
               <div className="study-cta-block">
-                <div className="study-notice"><span className="study-bang" aria-hidden="true">!</span><p><strong>Read the <a href="#registration">guide</a> first. It is important.</strong> Most rejected applications come from a skipped step.</p></div>
+                <div className="study-notice"><span className="study-bang" aria-hidden="true">!</span><p><strong>Read the <a href={guideUrl} target="_blank" rel="noopener noreferrer">guide</a> first. It is important.</strong> Most rejected applications come from a skipped step.</p></div>
                 <div className="study-cta-row">
-                  <a className="study-cta study-primary" href={formUrl} target="_blank" rel="noopener noreferrer">Register now <ArrowCircle /></a>
-                  <a className="study-cta study-secondary" href="#registration">Read the guide <ArrowCircle /></a>
+                  <a className="study-cta study-primary" href="#milestone-board">Milestone Board <ArrowCircle /></a>
                 </div>
                 <p className="study-deadline"><span className="study-deadline-dot" aria-hidden="true" /><strong>Registration closes 27 Oct, 11:59 PM IST</strong></p>
               </div>
@@ -108,62 +107,6 @@ export default async function HomePage() {
             </div>
           </section>
 
-          <section id="registration" aria-labelledby="how-title">
-            <details className="study-collapsible">
-              <summary className="study-section-title study-summary">
-                <svg className="study-wave" viewBox="0 0 250 56" aria-hidden="true"><path d="M3 38c26-26 41-26 64 0s38 26 62 0 40-26 64 0 37 23 54-1" /></svg>
-                <span className="study-mono">Registration guide</span>
-                <h2 id="how-title">Register in three steps.</h2>
-                <p>Do them in order. Skipping one is the usual reason an application gets rejected.</p>
-                <span className="study-summary-cue">Click to open the steps</span>
-              </summary>
-              <div className="study-steps">
-                <article className="study-step study-step-one">
-                  <div className="study-step-head"><span className="study-num">1</span><h3>Make a brand-new Google account</h3></div>
-                  <p className="study-sub">Not your personal, college or old account. This one is only for Google Skills and the form.</p>
-                  <ul>
-                    <li>Open an <strong>Incognito</strong> window in Chrome.</li>
-                    <li>Go to <a href="https://accounts.google.com/signup" target="_blank" rel="noopener noreferrer"><code>accounts.google.com/signup</code></a> and follow the prompts.</li>
-                    <li><strong>Save the new email and password</strong> somewhere safe.</li>
-                  </ul>
-                  <div className="study-alert"><span className="study-alert-label">Must be new</span>Created on or after <strong>14 Sept 2026</strong>. An older account gets rejected.</div>
-                </article>
-                <article className="study-step study-step-two">
-                  <div className="study-step-head"><span className="study-num">2</span><h3>Make your Skills profile public</h3></div>
-                  <p className="study-sub">Sign in at <a href="https://www.skills.google/" target="_blank" rel="noopener noreferrer"><code>skills.google</code></a> with the new account.</p>
-                  <ul>
-                    <li>Profile icon <strong>→ Settings → Account → Public visibility</strong>.</li>
-                    <li>Tick <strong>Make profile public</strong>, then <strong>Update settings</strong>.</li>
-                    <li><strong>Copy the link</strong> in the green box and save it. It looks like <code>skills.google/public_profiles/…</code></li>
-                  </ul>
-                  <div className="study-alert"><span className="study-alert-label">No green box?</span>The profile is not public yet. Press Update settings again.</div>
-                </article>
-                <article className="study-step study-step-three">
-                  <div className="study-step-head"><span className="study-num">3</span><h3>Fill in the registration form</h3></div>
-                  <p className="study-sub">Use a laptop, signed in with the new account, with Google Skills open in another tab. The form asks for these, in this order.</p>
-                  <div className="study-cta-row"><a className="study-cta study-primary" href={formUrl} target="_blank" rel="noopener noreferrer">Open the form <ArrowCircle /></a></div>
-                  <div className="study-form-window"><dl>
-                    <div className="study-form-row"><dt>Email</dt><dd>The new account. Use <strong>Switch account</strong> if the form shows another.</dd></div>
-                    <div className="study-form-row"><dt>Terms</dt><dd><strong>Yes, I accept the terms</strong><small>Declining means no Google Skills access code.</small></dd></div>
-                    <div className="study-form-row"><dt>Your details</dt><dd>Full name as on your ID, gender, learner category.</dd></div>
-                    <div className="study-form-row"><dt>Organiser</dt><dd><strong>GDG on Campus Organiser</strong></dd></div>
-                    <div className="study-form-row study-form-key"><dt>Referral code</dt><dd><span className="study-answer"><strong>GDGC-KIIT1</strong><CopyReferralButton className="study-copy-pill" /></span><small>Type it exactly. It credits your registration to KIIT.</small></dd></div>
-                    <div className="study-form-row"><dt>Laptop + internet</dt><dd><strong>Yes</strong></dd></div>
-                    <div className="study-form-row"><dt>Skills account</dt><dd>Tick <strong>I verify</strong>, then enter the same new email again.</dd></div>
-                    <div className="study-form-row study-form-key"><dt>Profile URL</dt><dd>Paste <strong>your own</strong> link from Step 2, never the sample. Open it in a new tab to check it loads.</dd></div>
-                    <div className="study-form-row"><dt>Last page</dt><dd>Tick <strong>I Acknowledge</strong> and <strong>Yes, I Agree</strong>, then press <strong>Submit once</strong>.</dd></div>
-                  </dl></div>
-                  <p className="study-jump">After the profile URL the form may jump straight to the last page. That is normal.</p>
-                  <div className="study-alert study-alert-rejected"><span className="study-alert-label">Rejected if</span><ul>
-                    <li>The email differs between the form and Google Skills.</li>
-                    <li>The profile is private, or the sample link is pasted.</li>
-                    <li>The referral code is missing or wrong.</li>
-                    <li>You submit twice. Earlier entries are deleted and you can lose progress.</li>
-                  </ul></div>
-                </article>
-              </div>
-            </details>
-          </section>
 
           <section className="study-important" aria-labelledby="important-title">
             <h2 id="important-title">Important:</h2>
@@ -187,7 +130,7 @@ export default async function HomePage() {
           <footer className="study-footer">
             <p><strong>GDG on Campus · KIIT</strong></p>
             <p className="study-footer-small">Run by students, open to every branch, free since 2017.</p>
-            <p className="study-local-links"><Link href="/leaderboard">Badge leaderboard <ArrowUpRight aria-hidden="true" /></Link><Link href="/admin">Admin <ArrowUpRight aria-hidden="true" /></Link></p>
+            <p className="study-local-links"><Link href="/#milestone-board">Milestone Board <ArrowUpRight aria-hidden="true" /></Link><Link href="/admin">Admin <ArrowUpRight aria-hidden="true" /></Link></p>
           </footer>
         </main>
       </div>
