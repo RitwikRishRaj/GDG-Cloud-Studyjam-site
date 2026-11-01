@@ -313,10 +313,10 @@
   .rankCell { grid-column: 1; grid-row: 1 / span 2; align-self: start; }
   .nameCell { grid-column: 2; grid-row: 1; }
   .badgesCell { grid-column: 3; grid-row: 1; text-align: right; white-space: nowrap; }
-  .table .badgesCell .study-row-progress { display: flex; gap: 4px; }
+  .table .badgesCell :global(.study-row-progress) { display: flex; gap: 4px; }
   .milestoneCell { grid-column: 2; grid-row: 2; }
   .dateCell { grid-column: 3; grid-row: 2; white-space: nowrap; }
-  .table .dateCell .study-row-date { display: inline; }
+  .table .dateCell :global(.study-row-date) { display: inline; }
   .mobileLabel {
     display: inline;
     margin-right: 5px;

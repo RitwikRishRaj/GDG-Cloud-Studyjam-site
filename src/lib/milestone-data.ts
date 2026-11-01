@@ -24,7 +24,8 @@ export async function getMilestoneData(): Promise<{
   try {
     const [board, stats] = await Promise.all([
       pool.query<MilestoneRow>(`
-        SELECT rank, name, badge_count, highest_milestone, milestone_reached_on
+        SELECT rank, name, badge_count, highest_milestone,
+          milestone_reached_on::text AS milestone_reached_on
         FROM public.milestone_board
         ORDER BY rank, name, badge_count DESC, milestone_reached_on
       `),
