@@ -219,3 +219,5 @@ COMMENT ON VIEW public.milestone_board IS
   'Public projection only: rank, name, curriculum badge count, milestone, and milestone date.';
 COMMENT ON VIEW public.milestone_stats IS
   'Public totals and aggregate milestone counts; contains no participant identifiers.';
+
+NOTIFY pgrst, 'reload schema';

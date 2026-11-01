@@ -42,12 +42,20 @@ def main() -> int:
         or os.environ.get("NEXT_PUBLIC_SUPABASE_ANON_KEY")
         or ""
     )
-    if not project_url or not anon_key:
-        print("Set the Supabase URL and anon key in .env.local to run this check.", file=sys.stderr)
+    publishable_key = (
+        os.environ.get("SUPABASE_PUBLISHABLE_KEY")
+        or os.environ.get("NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY")
+        or ""
+    )
+    if not project_url or not (anon_key or publishable_key):
+        print("Set the Supabase URL and public anon/publishable key in .env.local to run this check.", file=sys.stderr)
         return 2
 
     rest_url = f"{project_url}/rest/v1"
-    headers = {"apikey": anon_key, "Authorization": f"Bearer {anon_key}"}
+    public_key = anon_key or publishable_key
+    headers = {"apikey": public_key}
+    if anon_key:
+        headers["Authorization"] = f"Bearer {anon_key}"
     failed = False
 
     for table in BASE_TABLES:
@@ -57,11 +65,14 @@ def main() -> int:
             params={"select": "*", "limit": "0"},
             timeout=20,
         )
-        if 200 <= response.status_code < 300:
-            print(f"FAIL: anon can select from base table {table} (HTTP {response.status_code}).")
+        if response.status_code in {401, 403}:
+            print(f"PASS: anon is denied base table {table} (HTTP {response.status_code}).")
+        elif response.status_code == 404:
+            print(f"INCONCLUSIVE: base table {table} is not in the REST schema cache (HTTP 404).")
             failed = True
         else:
-            print(f"PASS: anon cannot select from base table {table} (HTTP {response.status_code}).")
+            print(f"FAIL: unexpected base table response for {table} (HTTP {response.status_code}).")
+            failed = True
 
     for view, allowed in PUBLIC_COLUMNS.items():
         response = requests.get(

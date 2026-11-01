@@ -91,13 +91,13 @@ python scripts/test_import_participants.py
 
 The workflow at `.github/workflows/nightly-scrape.yml` runs at `0 20 * * *` UTC (01:30 IST) and supports `workflow_dispatch`. In the repository's Actions secrets, add `DATABASE_URL` with the Supabase session-mode pooler connection string. Do not add CSVs, `.env` files, anon keys, or passwords to the repository. To add a second daily run, add one more `- cron: "..."` item under `schedule`.
 
-For local anon-key checks, put `SUPABASE_URL` and `SUPABASE_ANON_KEY` (or their `NEXT_PUBLIC_` equivalents) in the ignored `.env.local`, then run:
+For local anon-key checks, put `SUPABASE_URL` and either the legacy `SUPABASE_ANON_KEY` or the public `SUPABASE_PUBLISHABLE_KEY` (or the corresponding `NEXT_PUBLIC_` variable) in the ignored `.env.local`, then run:
 
 ```sh
 python scripts/verify_supabase_anon.py
 ```
 
-The script requests zero rows from every base table, verifies that anon cannot select them, and checks that anon can read only the two views. It never prints the key or response bodies.
+The script requests zero rows from every base table, requires 401/403 denials, and checks that anon can read only the two views. A 404 is reported as inconclusive because the table or view may be missing from the REST schema cache. It never prints the key or response bodies.
 
 ## Vercel deployment
 
