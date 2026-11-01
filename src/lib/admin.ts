@@ -22,7 +22,9 @@ export function verifyPassword(password: string): boolean {
 }
 
 function sign(payload: string): string {
-  return crypto.createHmac("sha256", getSecret()).update(payload).digest("hex");
+  const secret = getSecret();
+  if (!secret) return "";
+  return crypto.createHmac("sha256", secret).update(payload).digest("hex");
 }
 
 export function createSessionValue(): string {
