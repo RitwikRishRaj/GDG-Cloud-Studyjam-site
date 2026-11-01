@@ -39,16 +39,17 @@ WHERE sheet_badge_count = 0 AND badge_count <> 0;
 CREATE UNIQUE INDEX IF NOT EXISTS participants_email_idx
   ON public.participants (email);
 CREATE UNIQUE INDEX IF NOT EXISTS participants_profile_id_idx
-  ON public.participants (profile_id)
-  WHERE profile_id IS NOT NULL;
+  ON public.participants (profile_id);
 CREATE INDEX IF NOT EXISTS participants_badge_count_idx
   ON public.participants (badge_count);
 
 CREATE TABLE IF NOT EXISTS public.badges (
   id serial PRIMARY KEY,
   name text NOT NULL,
-  norm_name text NOT NULL UNIQUE
+  norm_name text NOT NULL
 );
+CREATE UNIQUE INDEX IF NOT EXISTS badges_norm_name_idx
+  ON public.badges (norm_name);
 
 CREATE TABLE IF NOT EXISTS public.completions (
   participant_id uuid NOT NULL REFERENCES public.participants(id) ON DELETE CASCADE,
@@ -73,13 +74,13 @@ CREATE TABLE IF NOT EXISTS public.sync_logs (
   rows_added integer NOT NULL DEFAULT 0,
   rows_updated integer NOT NULL DEFAULT 0,
   message text,
-  created_at timestamptz NOT NULL DEFAULT now()
+  created_at timestamp NOT NULL DEFAULT now()
 );
 
 CREATE TABLE IF NOT EXISTS public.settings (
   key text PRIMARY KEY,
   value jsonb,
-  updated_at timestamptz NOT NULL DEFAULT now()
+  updated_at timestamp NOT NULL DEFAULT now()
 );
 
 INSERT INTO public.badges (name, norm_name) VALUES
@@ -113,7 +114,20 @@ WITH ordered_completions AS (
       ORDER BY c.earned_on, c.badge_id
     ) AS badge_ordinal
   FROM public.completions AS c
+  JOIN public.badges AS b ON b.id = c.badge_id
   WHERE c.earned_on <= DATE '2026-11-23'
+    AND b.norm_name IN (
+      'the basics of google cloud compute',
+      'configure service accounts and iam roles for google cloud',
+      'implement speech and language solutions with pre trained apis',
+      'develop ai powered prototypes in google ai studio',
+      'analyze images with the cloud vision api',
+      'build a website on google cloud',
+      'create your first gemini enterprise application',
+      'store process and manage data on google cloud console',
+      'using the google cloud speech api',
+      'explore generative ai in agent platform'
+    )
 ),
 participant_counts AS (
   SELECT
@@ -160,8 +174,21 @@ CREATE OR REPLACE VIEW public.milestone_stats
 WITH (security_barrier = true) AS
 WITH participant_counts AS (
   SELECT participant_id, count(*)::integer AS badge_count
-  FROM public.completions
-  WHERE earned_on <= DATE '2026-11-23'
+  FROM public.completions AS c
+  JOIN public.badges AS b ON b.id = c.badge_id
+  WHERE c.earned_on <= DATE '2026-11-23'
+    AND b.norm_name IN (
+      'the basics of google cloud compute',
+      'configure service accounts and iam roles for google cloud',
+      'implement speech and language solutions with pre trained apis',
+      'develop ai powered prototypes in google ai studio',
+      'analyze images with the cloud vision api',
+      'build a website on google cloud',
+      'create your first gemini enterprise application',
+      'store process and manage data on google cloud console',
+      'using the google cloud speech api',
+      'explore generative ai in agent platform'
+    )
   GROUP BY participant_id
 )
 SELECT
@@ -180,6 +207,8 @@ REVOKE ALL ON TABLE
   public.settings,
   public.milestone_board,
   public.milestone_stats
+FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON SEQUENCE public.badges_id_seq, public.sync_logs_id_seq
 FROM PUBLIC, anon, authenticated;
 
 GRANT USAGE ON SCHEMA public TO anon, authenticated;

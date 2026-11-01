@@ -2,6 +2,11 @@ import Link from "next/link";
 import { ArrowRight, ArrowUpRight, ClipboardList, MessageCircle } from "lucide-react";
 import { CopyReferralButton } from "@/components/copy-referral";
 import { StudyMasthead } from "@/components/study-masthead";
+import { MilestoneBoard, MilestoneStats } from "@/components/leaderboard";
+import { MilestoneCountdown } from "@/components/milestone-countdown";
+import milestoneStyles from "@/components/milestone-board.module.css";
+import { getMilestoneData } from "@/lib/milestone-data";
+import { CAMPAIGN_DEADLINE } from "@/lib/campaign";
 
 const formUrl = "https://docs.google.com/forms/d/e/1FAIpQLScIxD14Pyc183PbDLHcS9N-nbQRRYSncqY0TP3g7qSsfWgnKQ/viewform";
 const syllabusUrl = "https://goo.gle/lwc-student-curriculum";
@@ -12,7 +17,11 @@ function ArrowCircle({ className = "" }: { className?: string }) {
   return <span className={`go ${className}`} aria-hidden="true"><ArrowRight /></span>;
 }
 
-export default function HomePage() {
+export const dynamic = "force-dynamic";
+
+export default async function HomePage() {
+  const milestoneData = await getMilestoneData();
+
   return (
     <div className="study-site">
       <div className="study-wrap">
@@ -45,6 +54,40 @@ export default function HomePage() {
                 <CopyReferralButton className="study-ticket-copy" />
               </div>
             </div>
+          </section>
+
+          <section id="milestone-board" className={milestoneStyles.section} aria-labelledby="milestone-title">
+            <div className={milestoneStyles.countdownHeader}>
+              <span className="study-mono">Campaign deadline</span>
+              <h2 id="milestone-title" className={milestoneStyles.countdownHeading}>Milestone Board</h2>
+              <p className={milestoneStyles.deadline}>{CAMPAIGN_DEADLINE.label}</p>
+              <MilestoneCountdown />
+            </div>
+            <div className={milestoneStyles.curriculumLink}>
+              <a className="study-cta study-secondary" href={syllabusUrl} target="_blank" rel="noopener noreferrer">
+                Open curriculum <ArrowCircle />
+              </a>
+            </div>
+            {milestoneData ? (
+              <MilestoneStats stats={milestoneData.stats} />
+            ) : (
+              <p role="status">Progress statistics are temporarily unavailable.</p>
+            )}
+            <section aria-labelledby="board-table-title">
+              <div className="study-section-title">
+                <span className="study-mono">Progress by milestone</span>
+                <h3 id="board-table-title">Participants who reached a milestone.</h3>
+                <p>Ranked by the highest milestone reached and the date it was earned.</p>
+              </div>
+              {milestoneData ? (
+                <MilestoneBoard rows={milestoneData.rows} lastUpdated={milestoneData.stats.last_updated} />
+              ) : (
+                <div className="study-empty" role="status"><p>The Milestone Board is temporarily unavailable.</p></div>
+              )}
+              <p className={milestoneStyles.footnote}>
+                Provisional progress guide only. Rewards are limited and final eligibility is determined by Google’s campaign rules; this is not the official result.
+              </p>
+            </section>
           </section>
 
           <section id="syllabus" aria-labelledby="syllabus-title">

@@ -10,4 +10,8 @@ dist/
 !.env.example
 
 *.tsbuildinfo
+__pycache__/
+*.py[cod]
 *.csv
+*.dump
+*.backup

@@ -1,0 +1,335 @@
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+}
+
+.countdownHeader {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 24px;
+  border: 2px solid var(--ink);
+  border-radius: 20px;
+  background: var(--surface);
+  box-shadow: 0 5px 0 var(--ink);
+}
+
+.countdownHeading {
+  margin: 0;
+  font-family: Outfit, "Segoe UI", system-ui, sans-serif;
+  font-size: clamp(1.35rem, 3vw, 2rem);
+  font-weight: 700;
+  letter-spacing: -.035em;
+  line-height: 1.15;
+}
+
+.deadline {
+  margin: 0;
+  color: var(--muted);
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: .76rem;
+}
+
+.countdown {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  width: min(100%, 560px);
+}
+
+.countdownUnit {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 10px 6px;
+  border: 1.5px solid var(--line);
+  border-radius: 14px;
+  background: var(--bg);
+}
+
+.countdownValue {
+  font-family: Outfit, "Segoe UI", system-ui, sans-serif;
+  font-size: clamp(1.6rem, 6vw, 2.5rem);
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  letter-spacing: -.05em;
+  line-height: 1;
+}
+
+.countdownLabel {
+  color: var(--muted);
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: .62rem;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+
+.countdownEnded {
+  width: fit-content;
+  margin: 0;
+  padding: 10px 14px;
+  border: 1.5px solid var(--ink);
+  border-radius: 12px;
+  background: var(--highlight);
+  font-weight: 700;
+}
+
+.curriculumLink {
+  width: fit-content;
+}
+
+.stats {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.participantTotal,
+.statCard {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 20px;
+  border: 2px solid var(--ink);
+  border-radius: 20px;
+  background: var(--surface);
+}
+
+.participantTotal strong {
+  font-family: Outfit, "Segoe UI", system-ui, sans-serif;
+  font-size: clamp(2rem, 5vw, 3rem);
+  font-weight: 700;
+  letter-spacing: -.06em;
+  line-height: 1;
+}
+
+.participantTotal > span:last-child,
+.statHeading > div > span {
+  color: var(--muted);
+  font-size: .78rem;
+}
+
+.statHeading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.statHeading h3 {
+  margin: 0 0 3px;
+  font-family: Outfit, "Segoe UI", system-ui, sans-serif;
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+.statHeading > strong {
+  font-family: Outfit, "Segoe UI", system-ui, sans-serif;
+  font-size: 1.5rem;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+
+.progressTrack {
+  overflow: hidden;
+  height: 10px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--bg);
+}
+
+.progressFill {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+}
+
+.one { background: var(--blue); }
+.two { background: var(--yellow); }
+.three { background: var(--green); }
+
+.statFoot {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0;
+  color: var(--muted);
+  font-size: .72rem;
+  line-height: 1.4;
+}
+
+.lastUpdated {
+  margin: 14px 0 0;
+  color: var(--muted);
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: .7rem;
+}
+
+.footnote {
+  margin: 18px 0 0;
+  padding: 12px 14px;
+  border-left: 4px solid var(--blue);
+  color: var(--muted);
+  font-size: .8rem;
+  line-height: 1.5;
+}
+
+.tableScroll {
+  width: 100%;
+}
+
+.table {
+  display: block;
+  width: 100%;
+  border-collapse: separate;
+  text-align: left;
+}
+
+.table .tableHead {
+  display: block;
+  margin-top: 24px;
+  padding: 0 16px 8px;
+  color: var(--muted);
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: .62rem;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+
+.tableHead tr,
+.tableRow {
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr) 156px 96px 105px;
+  align-items: center;
+  gap: 14px;
+}
+
+.tableHead th {
+  min-width: 0;
+  font-weight: 500;
+}
+
+.tableHead th:last-child,
+.dateCell {
+  text-align: right;
+}
+
+.table .tableBody {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+}
+
+.tableRow {
+  padding: 12px 16px;
+}
+
+.cell {
+  min-width: 0;
+  padding: 0;
+}
+
+.rankCell {
+  display: flex;
+  align-items: center;
+}
+
+.nameCell {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 400;
+}
+
+.badgesCell,
+.milestoneCell,
+.dateCell {
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: .72rem;
+}
+
+
+.mobileLabel { display: none; }
+
+.pagination {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 14px;
+  color: var(--muted);
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: .68rem;
+}
+
+.pagination > div {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.pagination button:disabled {
+  cursor: not-allowed;
+  opacity: .5;
+}
+
+@media (max-width: 1000px) {
+  .stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .tableHead tr,
+  .tableRow {
+    grid-template-columns: 40px minmax(0, 1fr) 120px 100px 90px;
+    gap: 10px;
+  }
+}
+
+@media (max-width: 760px) {
+  .countdownHeader { padding: 20px; }
+  .stats { grid-template-columns: minmax(0, 1fr); }
+  .participantTotal,
+  .statCard { padding: 18px; }
+  .table .tableHead {
+    position: absolute;
+    display: block;
+    overflow: hidden;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+  .tableRow {
+    grid-template-columns: 38px minmax(0, 1fr) auto;
+    gap: 8px 9px;
+    padding: 11px 12px;
+  }
+  .cell { align-self: center; }
+  .rankCell { grid-column: 1; grid-row: 1 / span 2; align-self: start; }
+  .nameCell { grid-column: 2; grid-row: 1; }
+  .badgesCell { grid-column: 3; grid-row: 1; text-align: right; white-space: nowrap; }
+  .table .badgesCell .study-row-progress { display: flex; gap: 4px; }
+  .milestoneCell { grid-column: 2; grid-row: 2; }
+  .dateCell { grid-column: 3; grid-row: 2; white-space: nowrap; }
+  .table .dateCell .study-row-date { display: inline; }
+  .mobileLabel {
+    display: inline;
+    margin-right: 5px;
+    color: var(--muted);
+    font-family: "JetBrains Mono", ui-monospace, monospace;
+    font-size: .58rem;
+    letter-spacing: .025em;
+  }
+  .pagination,
+  .pagination > div { flex-wrap: wrap; }
+  .pagination { align-items: flex-start; flex-direction: column; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .progressFill { transition: none; }
+}
