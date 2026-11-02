@@ -113,7 +113,7 @@ export function MilestoneBoard({
     const name = query.trim().toLocaleLowerCase();
     return rows.filter((row) => {
       const matchesName = !name || row.name.toLocaleLowerCase().includes(name);
-      const matchesMilestone = filter === "all" || row.highest_milestone >= Number(filter);
+      const matchesMilestone = filter === "all" || row.highest_milestone === Number(filter);
       return matchesName && matchesMilestone;
     });
   }, [filter, query, rows]);
