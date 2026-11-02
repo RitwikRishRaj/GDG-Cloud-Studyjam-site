@@ -399,8 +399,18 @@ def main() -> int:
         metavar="URL",
         help="fetch one profile and print parsed curriculum badges as JSON",
     )
+    parser.add_argument(
+        "--limit",
+        type=int,
+        metavar="N",
+        help="scrape only the first N participants without writing a snapshot",
+    )
     args = parser.parse_args()
+    if args.limit is not None and args.limit < 1:
+        parser.error("--limit must be a positive integer.")
     if args.dump:
+        if args.limit is not None:
+            parser.error("--limit cannot be used with --dump.")
         return dump_profile(args.dump)
 
     load_local_environment()
@@ -423,6 +433,8 @@ def main() -> int:
                 return 0
 
         participants = load_participants(connection)
+        if args.limit is not None:
+            participants = participants[: args.limit]
         results = []
         with ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
             futures = [executor.submit(scrape_one, participant) for participant in participants]
@@ -445,13 +457,20 @@ def main() -> int:
             )
             return 1
 
-        write_snapshot(connection, datetime.now(IST).date())
-        logging.info(
-            "Scraped %d profiles; %d failed; snapshot saved for %s.",
-            len(participants),
-            failures,
-            datetime.now(IST).date().isoformat(),
-        )
+        if args.limit is None:
+            write_snapshot(connection, datetime.now(IST).date())
+            logging.info(
+                "Scraped %d profiles; %d failed; snapshot saved for %s.",
+                len(participants),
+                failures,
+                datetime.now(IST).date().isoformat(),
+            )
+        else:
+            logging.info(
+                "Scraped %d profiles; %d failed; no snapshot written for limited run.",
+                len(participants),
+                failures,
+            )
     return 0
 
 
