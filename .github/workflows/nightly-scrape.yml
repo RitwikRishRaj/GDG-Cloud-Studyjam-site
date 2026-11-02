@@ -2,17 +2,31 @@ name: Nightly Google Skills scrape
 
 on:
   schedule:
-    - cron: "0 20 * * *"
+    - cron: "0 1 * * *"
+      timezone: "Asia/Kolkata"
   workflow_dispatch:
 
 permissions:
   contents: read
+
+concurrency:
+  group: nightly-scrape
+  cancel-in-progress: false
 
 jobs:
   scrape:
     runs-on: ubuntu-latest
     timeout-minutes: 120
     steps:
+      - name: Verify snapshot revalidation configuration
+        env:
+          SNAPSHOT_REVALIDATE_URL: ${{ vars.SNAPSHOT_REVALIDATE_URL }}
+          SNAPSHOT_REVALIDATE_SECRET: ${{ secrets.SNAPSHOT_REVALIDATE_SECRET }}
+        run: |
+          if [[ -z "$SNAPSHOT_REVALIDATE_URL" || -z "$SNAPSHOT_REVALIDATE_SECRET" ]]; then
+            echo "::error::Set SNAPSHOT_REVALIDATE_URL and SNAPSHOT_REVALIDATE_SECRET in repository settings."
+            exit 1
+          fi
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
@@ -23,3 +37,14 @@ jobs:
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
         run: python scripts/scrape_profiles.py
+      - name: Refresh the cached leaderboard
+        env:
+          SNAPSHOT_REVALIDATE_URL: ${{ vars.SNAPSHOT_REVALIDATE_URL }}
+          SNAPSHOT_REVALIDATE_SECRET: ${{ secrets.SNAPSHOT_REVALIDATE_SECRET }}
+        run: |
+          curl --fail-with-body --silent --show-error \
+            --connect-timeout 10 --max-time 60 \
+            --retry 3 --retry-all-errors --retry-delay 2 \
+            --request POST \
+            --header "Authorization: Bearer $SNAPSHOT_REVALIDATE_SECRET" \
+            "$SNAPSHOT_REVALIDATE_URL"

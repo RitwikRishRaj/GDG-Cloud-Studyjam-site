@@ -1,5 +1,8 @@
 import "server-only";
+import { revalidatePath, revalidateTag, unstable_cache } from "next/cache";
 import { pool } from "@/db";
+
+export const MILESTONE_DATA_CACHE_TAG = "milestone-data";
 
 export type MilestoneRow = {
   rank: number;
@@ -17,11 +20,11 @@ export type MilestoneStats = {
   last_updated: string | null;
 };
 
-export async function getMilestoneData(): Promise<{
-  rows: MilestoneRow[];
-  stats: MilestoneStats;
-} | null> {
-  try {
+const getCachedMilestoneData = unstable_cache(
+  async (): Promise<{
+    rows: MilestoneRow[];
+    stats: MilestoneStats;
+  } | null> => {
     const [board, stats] = await Promise.all([
       pool.query<MilestoneRow>(`
         SELECT rank, name, badge_count, highest_milestone,
@@ -55,6 +58,17 @@ export async function getMilestoneData(): Promise<{
           : null,
       },
     };
+  },
+  ["milestone-board-snapshot-v1"],
+  { revalidate: 86_400, tags: [MILESTONE_DATA_CACHE_TAG] }
+);
+
+export async function getMilestoneData(): Promise<{
+  rows: MilestoneRow[];
+  stats: MilestoneStats;
+} | null> {
+  try {
+    return await getCachedMilestoneData();
   } catch (error) {
     console.error(
       "Milestone board views are unavailable.",
@@ -62,4 +76,16 @@ export async function getMilestoneData(): Promise<{
     );
     return null;
   }
+}
+
+export function invalidateMilestoneData() {
+  revalidateTag(MILESTONE_DATA_CACHE_TAG, { expire: 0 });
+  revalidatePath("/");
+}
+
+export async function refreshMilestoneData() {
+  revalidateTag(MILESTONE_DATA_CACHE_TAG, { expire: 0 });
+  const snapshot = await getMilestoneData();
+  if (snapshot) revalidatePath("/");
+  return snapshot;
 }

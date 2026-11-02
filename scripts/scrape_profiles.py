@@ -25,7 +25,8 @@ import requests
 from requests.adapters import HTTPAdapter
 from selectolax.parser import HTMLParser
 from urllib3.util.retry import Retry
-from local_env import load_local_environment
+
+logger = logging.getLogger(__name__)
 
 IST = ZoneInfo("Asia/Kolkata")
 CAMPAIGN_START = date(2026, 9, 14)
@@ -209,7 +210,8 @@ def scrape_one(participant: tuple[str, str, str, int]) -> dict[str, Any]:
             "unknown_badge_names": unknown,
             "error": str(error),
         }
-    except Exception as error:
+    # Keep an unexpected profile error from aborting the rest of the scrape.
+    except Exception as error:  # noqa: BLE001
         return {
             "participant_id": participant_id,
             "ok": False,
@@ -383,11 +385,10 @@ def save_result(connection: psycopg.Connection, result: dict[str, Any]) -> None:
 
 def write_snapshot(connection: psycopg.Connection, snap_date: date) -> None:
     curriculum_names = list(CURRICULUM_BY_NAME)
-    with connection.transaction():
-        with connection.cursor() as cursor:
-            cursor.execute(
-                """
-                WITH ordered AS (
+    with connection.transaction(), connection.cursor() as cursor:
+        cursor.execute(
+            """
+            WITH ordered AS (
                   SELECT c.participant_id, c.badge_id, c.earned_on,
                     row_number() OVER (
                       PARTITION BY c.participant_id
@@ -431,9 +432,9 @@ def write_snapshot(connection: psycopg.Connection, snap_date: date) -> None:
                 ON CONFLICT (snap_date, participant_id) DO UPDATE SET
                   badge_count = EXCLUDED.badge_count,
                   rank = EXCLUDED.rank
-                """,
-                (CAMPAIGN_START, EASTERN_DEADLINE_DATE, curriculum_names, snap_date),
-            )
+            """,
+            (CAMPAIGN_START, EASTERN_DEADLINE_DATE, curriculum_names, snap_date),
+        )
 
 
 def append_unknown_badges(results: list[dict[str, Any]]) -> None:
@@ -454,15 +455,14 @@ def append_unknown_badges(results: list[dict[str, Any]]) -> None:
 def write_batch(database_url: str, results: list[dict[str, Any]]) -> None:
     for retry in range(MAX_DB_RETRIES + 1):
         try:
-            with psycopg.connect(database_url) as connection:
-                with connection.transaction():
-                    for result in results:
-                        save_result(connection, result)
+            with psycopg.connect(database_url) as connection, connection.transaction():
+                for result in results:
+                    save_result(connection, result)
             return
         except (psycopg.OperationalError, psycopg.InterfaceError):
             if retry == MAX_DB_RETRIES:
                 raise
-            logging.warning(
+            logger.warning(
                 "Database connection failed while saving a batch; retry %d of %d.",
                 retry + 1,
                 MAX_DB_RETRIES,
@@ -498,7 +498,10 @@ def campaign_status_counts(connection: psycopg.Connection) -> tuple[int, int, in
                 WHERE scrape_status IN ('error', 'skipped')
                   AND last_error NOT LIKE 'HTTP 404%'
               )::integer,
-              count(*) FILTER (WHERE scrape_status NOT IN ('success', 'skipped'))::integer
+              count(*) FILTER (
+                WHERE scrape_status IS DISTINCT FROM 'success'
+                  AND scrape_status IS DISTINCT FROM 'skipped'
+              )::integer
             FROM public.participants
             WHERE profile_id IS NOT NULL
             """
@@ -550,6 +553,8 @@ def main() -> int:
         if args.limit is not None:
             parser.error("--limit cannot be used with --dump.")
         return dump_profile(args.dump)
+
+    from local_env import load_local_environment
 
     load_local_environment()
     database_url = os.environ.get("DATABASE_URL")
@@ -605,7 +610,8 @@ def main() -> int:
             for future in as_completed(futures):
                 try:
                     results.append(future.result())
-                except Exception as error:
+                # Preserve other results if an unexpected worker error escapes.
+                except Exception as error:  # noqa: BLE001
                     results.append(
                         {
                             "participant_id": futures[future][0],
@@ -624,8 +630,7 @@ def main() -> int:
             batch_ok, batch_not_found, batch_errors = result_counts(results)
             try:
                 write_batch(database_url, results)
-                append_unknown_badges(results)
-            except Exception as error:
+            except (psycopg.Error, ProfileError) as error:
                 processed += len(results)
                 ok_total += batch_ok
                 not_found_total += batch_not_found
@@ -642,6 +647,14 @@ def main() -> int:
                     file=sys.stderr,
                 )
                 return 1
+
+            try:
+                append_unknown_badges(results)
+            except OSError as error:
+                logger.warning(
+                    "Could not save the unknown-badge report (%s).",
+                    type(error).__name__,
+                )
 
             processed += len(results)
             ok_total += batch_ok
@@ -678,7 +691,7 @@ def main() -> int:
 
     failure_rate = (all_not_found + all_errors) / all_total if all_total else 0
     if failure_rate >= 0.30:
-        logging.error(
+        logger.error(
             "%d of %d profiles failed (%.1f%%); no snapshot written.",
             all_not_found + all_errors,
             all_total,
@@ -708,7 +721,7 @@ def main() -> int:
                 file=sys.stderr,
             )
             return 1
-        logging.info("Snapshot saved for %s.", datetime.now(IST).date().isoformat())
+        logger.info("Snapshot saved for %s.", datetime.now(IST).date().isoformat())
 
     print_summary(processed, total, ok_total, not_found_total, errors_total)
     print(

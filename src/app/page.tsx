@@ -18,7 +18,7 @@ function ArrowCircle({ className = "" }: { className?: string }) {
 }
 
 
-export const dynamic = "force-dynamic";
+export const revalidate = 86_400;
 
 export default async function HomePage() {
   const milestoneData = await getMilestoneData();

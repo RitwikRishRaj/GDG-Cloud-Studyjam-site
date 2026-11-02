@@ -4,6 +4,7 @@ import { db } from "@/db";
 import { participants } from "@/db/schema";
 import { adminGuard } from "@/lib/api-guard";
 import { hueFromString, parseDateSmart } from "@/lib/format";
+import { invalidateMilestoneData } from "@/lib/milestone-data";
 
 export async function POST(req: NextRequest) {
   const guard = await adminGuard(req);
@@ -64,6 +65,7 @@ export async function POST(req: NextRequest) {
           },
         });
     }
+    invalidateMilestoneData();
     return NextResponse.json({ ok: true });
   } catch (err) {
     return NextResponse.json(
@@ -87,6 +89,7 @@ export async function DELETE(req: NextRequest) {
       );
     }
     await db.delete(participants).where(eq(participants.id, id));
+    invalidateMilestoneData();
     return NextResponse.json({ ok: true });
   } catch (err) {
     return NextResponse.json(
