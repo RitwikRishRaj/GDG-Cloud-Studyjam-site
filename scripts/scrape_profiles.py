@@ -27,6 +27,7 @@ from urllib3.util.retry import Retry
 from local_env import load_local_environment
 
 IST = ZoneInfo("Asia/Kolkata")
+CAMPAIGN_START = date(2026, 9, 14)
 EASTERN_DEADLINE_DATE = date(2026, 11, 23)
 MAX_WORKERS = 6
 USER_AGENT = (
@@ -240,7 +241,7 @@ def load_participants(connection: psycopg.Connection) -> list[tuple[str, str, st
             """
             SELECT p.id::text, p.profile_id::text, p.profile_url,
               count(c.badge_id) FILTER (
-                WHERE c.earned_on <= %s
+                WHERE c.earned_on >= %s AND c.earned_on <= %s
                   AND b.norm_name = ANY(%s)
               )::integer AS existing_count
             FROM public.participants AS p
@@ -250,7 +251,7 @@ def load_participants(connection: psycopg.Connection) -> list[tuple[str, str, st
             GROUP BY p.id
             ORDER BY p.id
             """,
-            (EASTERN_DEADLINE_DATE, list(CURRICULUM_BY_NAME)),
+            (CAMPAIGN_START, EASTERN_DEADLINE_DATE, list(CURRICULUM_BY_NAME)),
         )
         rows = cursor.fetchall()
     return [
@@ -304,14 +305,16 @@ def save_result(connection: psycopg.Connection, result: dict[str, object]) -> No
                       FROM public.completions AS c
                       JOIN public.badges AS b ON b.id = c.badge_id
                       WHERE c.participant_id = p.id
-                        AND c.earned_on <= %s AND b.norm_name = ANY(%s)
+                        AND c.earned_on >= %s AND c.earned_on <= %s
+                        AND b.norm_name = ANY(%s)
                     ), 0),
                     last_badge_date = (
                       SELECT max(c.earned_on)::timestamp
                       FROM public.completions AS c
                       JOIN public.badges AS b ON b.id = c.badge_id
                       WHERE c.participant_id = p.id
-                        AND c.earned_on <= %s AND b.norm_name = ANY(%s)
+                        AND c.earned_on >= %s AND c.earned_on <= %s
+                        AND b.norm_name = ANY(%s)
                     ),
                     badges = COALESCE((
                       SELECT jsonb_agg(
@@ -321,16 +324,20 @@ def save_result(connection: psycopg.Connection, result: dict[str, object]) -> No
                       FROM public.completions AS c
                       JOIN public.badges AS b ON b.id = c.badge_id
                       WHERE c.participant_id = p.id
-                        AND c.earned_on <= %s AND b.norm_name = ANY(%s)
+                        AND c.earned_on >= %s AND c.earned_on <= %s
+                        AND b.norm_name = ANY(%s)
                     ), '[]'::jsonb),
                     updated_at = now()
                 WHERE p.id = %s
                 """,
                 (
+                    CAMPAIGN_START,
                     EASTERN_DEADLINE_DATE,
                     list(CURRICULUM_BY_NAME),
+                    CAMPAIGN_START,
                     EASTERN_DEADLINE_DATE,
                     list(CURRICULUM_BY_NAME),
+                    CAMPAIGN_START,
                     EASTERN_DEADLINE_DATE,
                     list(CURRICULUM_BY_NAME),
                     participant_id,
@@ -352,7 +359,8 @@ def write_snapshot(connection: psycopg.Connection, snap_date: date) -> None:
                     ) AS badge_ordinal
                   FROM public.completions AS c
                   JOIN public.badges AS b ON b.id = c.badge_id
-                  WHERE c.earned_on <= %s AND b.norm_name = ANY(%s)
+                  WHERE c.earned_on >= %s AND c.earned_on <= %s
+                    AND b.norm_name = ANY(%s)
                 ),
                 counts AS (
                   SELECT participant_id, count(*)::integer AS badge_count,
@@ -388,7 +396,7 @@ def write_snapshot(connection: psycopg.Connection, snap_date: date) -> None:
                   badge_count = EXCLUDED.badge_count,
                   rank = EXCLUDED.rank
                 """,
-                (EASTERN_DEADLINE_DATE, curriculum_names, snap_date),
+                (CAMPAIGN_START, EASTERN_DEADLINE_DATE, curriculum_names, snap_date),
             )
 
 

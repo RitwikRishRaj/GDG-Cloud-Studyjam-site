@@ -1,12 +1,16 @@
 from __future__ import annotations
 
 import unittest
-from unittest.mock import patch
+from datetime import date
+from unittest.mock import MagicMock, patch
 
 from scrape_profiles import (
+    CAMPAIGN_START,
+    EASTERN_DEADLINE_DATE,
     ProfileError,
     normalize_badge_name,
     parse_profile_badges,
+    save_result,
     scrape_one,
 )
 
@@ -45,6 +49,38 @@ class ProfileParserTests(unittest.TestCase):
 
 
 class ScrapeSafetyTests(unittest.TestCase):
+    def test_prestart_badge_is_stored_but_not_counted(self) -> None:
+        connection = MagicMock()
+        cursor = connection.cursor.return_value.__enter__.return_value
+        cursor.rowcount = 1
+        prestart_date = date(2026, 9, 13)
+
+        save_result(
+            connection,
+            {
+                "participant_id": "participant-id",
+                "ok": True,
+                "badges": {
+                    "the basics of google cloud compute": (
+                        "The Basics of Google Cloud Compute",
+                        prestart_date,
+                    )
+                },
+            },
+        )
+
+        insert_sql, insert_params = cursor.execute.call_args_list[0].args
+        aggregate_sql, aggregate_params = cursor.execute.call_args_list[1].args
+        self.assertIn("INSERT INTO public.completions", insert_sql)
+        self.assertEqual(insert_params[1], prestart_date)
+        self.assertEqual(aggregate_sql.count("c.earned_on >= %s"), 3)
+        self.assertEqual(aggregate_params[0], CAMPAIGN_START)
+        self.assertEqual(aggregate_params[1], EASTERN_DEADLINE_DATE)
+        self.assertEqual(aggregate_params[3], CAMPAIGN_START)
+        self.assertEqual(aggregate_params[4], EASTERN_DEADLINE_DATE)
+        self.assertEqual(aggregate_params[6], CAMPAIGN_START)
+        self.assertEqual(aggregate_params[7], EASTERN_DEADLINE_DATE)
+
     def test_zero_badge_parse_preserves_existing_completions(self) -> None:
         response = type("Response", (), {"status_code": 200, "ok": True, "text": "<html></html>"})()
         with patch("scrape_profiles.time.sleep"), patch("scrape_profiles.session_for_thread") as session:

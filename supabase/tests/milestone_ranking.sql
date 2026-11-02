@@ -13,7 +13,10 @@ INSERT INTO milestone_test_refs (label) VALUES
   ('m1-four'),
   ('m1-three'),
   ('nov-23'),
-  ('after-deadline');
+  ('after-deadline'),
+  ('before-start'),
+  ('start-date-first'),
+  ('split-start');
 
 CREATE TEMP TABLE milestone_test_before AS
 SELECT milestone_1_count, milestone_2_count, milestone_3_count
@@ -30,6 +33,9 @@ SELECT
     WHEN 'm1-four' THEN 'M1 Four Badges'
     WHEN 'm1-three' THEN 'M1 Three Badges'
     WHEN 'nov-23' THEN 'Nov 23 Completer'
+    WHEN 'before-start' THEN 'Before Start Only'
+    WHEN 'start-date-first' THEN 'Start Date Completer'
+    WHEN 'split-start' THEN 'Three Before Start'
     ELSE 'After deadline only'
   END,
   'milestone-test-' || r.label || '@example.invalid'
@@ -60,7 +66,10 @@ counts AS (
     ('m1-four', 4),
     ('m1-three', 3),
     ('nov-23', 4),
-    ('after-deadline', 10)
+    ('after-deadline', 10),
+    ('before-start', 3),
+    ('start-date-first', 3),
+    ('split-start', 5)
   ) AS data(label, badge_count)
 )
 INSERT INTO public.completions (participant_id, badge_id, earned_on)
@@ -74,6 +83,10 @@ SELECT
     WHEN r.label = 'nov-23' AND curriculum.badge_ordinal = 1 THEN DATE '2026-11-21'
     WHEN r.label = 'nov-23' AND curriculum.badge_ordinal = 2 THEN DATE '2026-11-22'
     WHEN r.label = 'nov-23' AND curriculum.badge_ordinal = 3 THEN DATE '2026-11-23'
+    WHEN r.label = 'before-start' THEN DATE '2026-09-13'
+    WHEN r.label = 'start-date-first' THEN DATE '2026-09-14' + curriculum.badge_ordinal::integer - 1
+    WHEN r.label = 'split-start' AND curriculum.badge_ordinal <= 3 THEN DATE '2026-09-13'
+    WHEN r.label = 'split-start' THEN DATE '2026-09-14' + curriculum.badge_ordinal::integer - 4
     ELSE DATE '2026-11-24'
   END
 FROM milestone_test_refs AS r
@@ -87,6 +100,8 @@ DECLARE
   same_rank integer;
   zulu_rank integer;
   nov_23 record;
+  start_date record;
+  stored_prestart_count integer;
   before_counts record;
   after_counts record;
 BEGIN
@@ -130,6 +145,30 @@ BEGIN
     RAISE EXCEPTION 'The complete Eastern deadline date must count.';
   END IF;
 
+  SELECT badge_count, highest_milestone, milestone_reached_on
+  INTO start_date
+  FROM public.milestone_board
+  WHERE name = 'Start Date Completer';
+  IF start_date.badge_count <> 3 OR start_date.highest_milestone <> 1
+     OR start_date.milestone_reached_on <> DATE '2026-09-16' THEN
+    RAISE EXCEPTION 'The inclusive campaign start date must count.';
+  END IF;
+
+  IF EXISTS (
+    SELECT 1 FROM public.milestone_board
+    WHERE name IN ('Before Start Only', 'Three Before Start')
+  ) THEN
+    RAISE EXCEPTION 'Pre-start badges must not contribute to milestones.';
+  END IF;
+
+  SELECT count(*)::integer INTO stored_prestart_count
+  FROM public.completions AS c
+  JOIN milestone_test_refs AS r ON r.participant_id = c.participant_id
+  WHERE r.label IN ('before-start', 'split-start');
+  IF stored_prestart_count <> 8 THEN
+    RAISE EXCEPTION 'Pre-start completions must remain stored.';
+  END IF;
+
   IF EXISTS (SELECT 1 FROM public.milestone_board WHERE name = 'After deadline only') THEN
     RAISE EXCEPTION 'Completions after the deadline must not count.';
   END IF;
@@ -137,7 +176,7 @@ BEGIN
   SELECT * INTO before_counts FROM milestone_test_before;
   SELECT milestone_1_count, milestone_2_count, milestone_3_count
   INTO after_counts FROM public.milestone_stats;
-  IF after_counts.milestone_1_count - before_counts.milestone_1_count <> 7
+  IF after_counts.milestone_1_count - before_counts.milestone_1_count <> 8
      OR after_counts.milestone_2_count - before_counts.milestone_2_count <> 4
      OR after_counts.milestone_3_count - before_counts.milestone_3_count <> 1 THEN
     RAISE EXCEPTION 'Cumulative stats counts failed: before %, after %', before_counts, after_counts;

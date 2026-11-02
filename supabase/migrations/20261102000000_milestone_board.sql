@@ -115,7 +115,8 @@ WITH ordered_completions AS (
     ) AS badge_ordinal
   FROM public.completions AS c
   JOIN public.badges AS b ON b.id = c.badge_id
-  WHERE c.earned_on <= DATE '2026-11-23'
+  WHERE c.earned_on >= DATE '2026-09-14'
+    AND c.earned_on <= DATE '2026-11-23'
     AND b.norm_name IN (
       'the basics of google cloud compute',
       'configure service accounts and iam roles for google cloud',
@@ -176,7 +177,8 @@ WITH participant_counts AS (
   SELECT participant_id, count(*)::integer AS badge_count
   FROM public.completions AS c
   JOIN public.badges AS b ON b.id = c.badge_id
-  WHERE c.earned_on <= DATE '2026-11-23'
+  WHERE c.earned_on >= DATE '2026-09-14'
+    AND c.earned_on <= DATE '2026-11-23'
     AND b.norm_name IN (
       'the basics of google cloud compute',
       'configure service accounts and iam roles for google cloud',
