@@ -10,11 +10,14 @@ from scrape_profiles import (
     CAMPAIGN_START,
     EASTERN_DEADLINE_DATE,
     ProfileError,
+    is_pending_status,
     normalize_badge_name,
     parse_profile_badges,
     result_counts,
     save_result,
     scrape_one,
+    scrape_with_retry,
+    should_write_snapshot,
     write_batch,
 )
 
@@ -53,6 +56,56 @@ class ProfileParserTests(unittest.TestCase):
 
 
 class ScrapeSafetyTests(unittest.TestCase):
+    def test_only_pending_excludes_success_and_terminal_skips(self) -> None:
+        statuses = [None, "pending", "error", "not_found", "success", "skipped"]
+        self.assertEqual(
+            [status for status in statuses if is_pending_status(status)],
+            [None, "pending", "error", "not_found"],
+        )
+
+    def test_fresh_failure_is_retried_once_and_then_skipped(self) -> None:
+        failure = {"participant_id": "id", "ok": False, "not_found": False, "error": "failed"}
+        with patch("scrape_profiles.scrape_one", side_effect=[failure.copy(), failure.copy()]) as scrape:
+            result = scrape_with_retry(("id", "profile", "url", 0, "pending"))
+        self.assertEqual(scrape.call_count, 2)
+        self.assertEqual(result["failure_streak"], 2)
+        self.assertFalse(result["ok"])
+
+    def test_previous_failure_gets_one_attempt_before_terminal_skip(self) -> None:
+        failure = {"participant_id": "id", "ok": False, "not_found": True, "error": "404"}
+        with patch("scrape_profiles.scrape_one", return_value=failure) as scrape:
+            result = scrape_with_retry(("id", "profile", "url", 0, "not_found"))
+        scrape.assert_called_once()
+        self.assertEqual(result["failure_streak"], 2)
+
+    def test_second_failure_is_saved_as_skipped(self) -> None:
+        connection = MagicMock()
+        save_result(
+            connection,
+            {
+                "participant_id": "participant-id",
+                "ok": False,
+                "failure_streak": 2,
+                "error": "profile unavailable",
+            },
+        )
+        _, params = connection.cursor.return_value.__enter__.return_value.execute.call_args.args
+        self.assertEqual(params[0], "skipped")
+
+    def test_snapshot_requires_no_pending_and_less_than_30_percent_failures(self) -> None:
+        self.assertTrue(should_write_snapshot(
+            only_pending=True, limit=300, pending_count=0, failure_rate=0.29,
+        ))
+        self.assertFalse(should_write_snapshot(
+            only_pending=True, limit=300, pending_count=1, failure_rate=0.0,
+        ))
+        self.assertFalse(should_write_snapshot(
+            only_pending=True, limit=None, pending_count=0, failure_rate=0.30,
+        ))
+        self.assertFalse(should_write_snapshot(
+            only_pending=False, limit=20, pending_count=0, failure_rate=0.0,
+        ))
+
     def test_result_counts_separate_success_not_found_and_errors(self) -> None:
         results = [
             {"ok": True},

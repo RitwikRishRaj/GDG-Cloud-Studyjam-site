@@ -78,7 +78,9 @@ To run the scraper locally, set `DATABASE_URL` to the Supabase **session-mode po
 python scripts/scrape_profiles.py
 ```
 
-It limits requests to six concurrent workers, retries 429/5xx/timeouts, waits briefly between requests, and only upserts known curriculum badges. Fetch/parse errors update scrape status but preserve completions. A zero-badge parse cannot erase existing data. If over 30% of profiles fail, the run exits non-zero without writing a snapshot. The first successful run after the deadline creates the final IST-dated snapshot; later runs do not change it.
+It limits requests to six concurrent workers, retries 429/5xx/timeouts, waits briefly between requests, and only upserts known curriculum badges. Fetch/parse errors update scrape status but preserve completions. A zero-badge parse cannot erase existing data. If the overall campaign failure rate is 30% or higher, the run exits non-zero without writing a snapshot. The first successful run after the deadline creates the final IST-dated snapshot; later runs do not change it.
+
+To resume without re-fetching successful profiles, run `python scripts/scrape_profiles.py --only-pending`. It processes pending, error, and not-found rows, while excluding successful or terminally skipped rows. A new failure gets one immediate retry; two consecutive failures mark that profile skipped so resume runs cannot loop on it. If batching with `--limit`, repeat until the output reports no pending profiles; only a complete run below the campaign failure threshold writes a snapshot.
 
 Run parser/importer checks with:
 

@@ -14,7 +14,8 @@ import threading
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import date, datetime
-
+from pathlib import Path
+from typing import Any
 from urllib.parse import urlparse
 from uuid import UUID
 from zoneinfo import ZoneInfo
@@ -157,8 +158,9 @@ def validate_profile_url(raw_url: str, expected_profile_id: str) -> str:
     return f"https://www.skills.google/public_profiles/{profile_id}"
 
 
-def scrape_one(participant: tuple[str, str, str, int]) -> dict[str, object]:
+def scrape_one(participant: tuple[str, str, str, int]) -> dict[str, Any]:
     participant_id, profile_id, raw_url, existing_count = participant
+    unknown: list[str] = []
     try:
         url = validate_profile_url(raw_url, profile_id)
         time.sleep(random.uniform(0.2, 0.7))
@@ -169,8 +171,6 @@ def scrape_one(participant: tuple[str, str, str, int]) -> dict[str, object]:
             raise ProfileError(f"HTTP {response.status_code} while fetching profile.")
 
         badges, unknown = parse_profile_badges(response.text)
-        for name in unknown:
-            logging.warning("Unknown badge name ignored: %s", name)
         if not badges and existing_count > 0:
             raise ProfileError(
                 "Profile parsed with zero curriculum badges; preserving previous completions."
@@ -179,6 +179,7 @@ def scrape_one(participant: tuple[str, str, str, int]) -> dict[str, object]:
             "participant_id": participant_id,
             "ok": True,
             "badges": badges,
+            "unknown_badge_names": unknown,
             "error": None,
         }
     except requests.RequestException as error:
@@ -187,6 +188,7 @@ def scrape_one(participant: tuple[str, str, str, int]) -> dict[str, object]:
             "ok": False,
             "not_found": False,
             "badges": {},
+            "unknown_badge_names": unknown,
             "error": f"Fetch failed after retries: {type(error).__name__}.",
         }
     except ProfileNotFound as error:
@@ -195,6 +197,7 @@ def scrape_one(participant: tuple[str, str, str, int]) -> dict[str, object]:
             "ok": False,
             "not_found": True,
             "badges": {},
+            "unknown_badge_names": unknown,
             "error": str(error),
         }
     except ProfileError as error:
@@ -203,6 +206,7 @@ def scrape_one(participant: tuple[str, str, str, int]) -> dict[str, object]:
             "ok": False,
             "not_found": False,
             "badges": {},
+            "unknown_badge_names": unknown,
             "error": str(error),
         }
     except Exception as error:
@@ -211,8 +215,28 @@ def scrape_one(participant: tuple[str, str, str, int]) -> dict[str, object]:
             "ok": False,
             "not_found": False,
             "badges": {},
+            "unknown_badge_names": unknown,
             "error": f"Unexpected scrape error: {type(error).__name__}.",
         }
+
+
+def scrape_with_retry(
+    participant: tuple[str, str, str, int, str | None],
+) -> dict[str, Any]:
+    previous_status = participant[4]
+    scrape_args = participant[:4]
+    result = scrape_one(scrape_args)
+    unknown = list(result.get("unknown_badge_names", []))
+    if not result["ok"]:
+        if previous_status not in {"error", "not_found"}:
+            retry_result = scrape_one(scrape_args)
+            unknown.extend(retry_result.get("unknown_badge_names", []))
+            result = retry_result
+        if not result["ok"]:
+            result["failure_streak"] = 2
+    result["previous_status"] = previous_status
+    result["unknown_badge_names"] = list(dict.fromkeys(unknown))
+    return result
 
 
 def dump_profile(url: str) -> int:
@@ -237,7 +261,9 @@ def dump_profile(url: str) -> int:
     return 0
 
 
-def load_participants(connection: psycopg.Connection) -> list[tuple[str, str, str, int]]:
+def load_participants(
+    connection: psycopg.Connection,
+) -> list[tuple[str, str, str, int, str | None]]:
     with connection.cursor() as cursor:
         cursor.execute(
             """
@@ -245,7 +271,7 @@ def load_participants(connection: psycopg.Connection) -> list[tuple[str, str, st
               count(c.badge_id) FILTER (
                 WHERE c.earned_on >= %s AND c.earned_on <= %s
                   AND b.norm_name = ANY(%s)
-              )::integer AS existing_count
+              )::integer AS existing_count, p.scrape_status
             FROM public.participants AS p
             LEFT JOIN public.completions AS c ON c.participant_id = p.id
             LEFT JOIN public.badges AS b ON b.id = c.badge_id
@@ -253,21 +279,29 @@ def load_participants(connection: psycopg.Connection) -> list[tuple[str, str, st
             GROUP BY p.id
             ORDER BY p.id
             """,
-            (CAMPAIGN_START, EASTERN_DEADLINE_DATE, list(CURRICULUM_BY_NAME)),
+            (
+                CAMPAIGN_START,
+                EASTERN_DEADLINE_DATE,
+                list(CURRICULUM_BY_NAME),
+            ),
         )
         rows = cursor.fetchall()
     return [
-        (participant_id, profile_id, profile_url or "", existing_count)
-        for participant_id, profile_id, profile_url, existing_count in rows
+        (participant_id, profile_id, profile_url or "", existing_count, status)
+        for participant_id, profile_id, profile_url, existing_count, status in rows
     ]
 
 
-def save_result(connection: psycopg.Connection, result: dict[str, object]) -> None:
+def save_result(connection: psycopg.Connection, result: dict[str, Any]) -> None:
     participant_id = str(result["participant_id"])
     with connection.transaction():
         with connection.cursor() as cursor:
             if not result["ok"]:
-                status = "not_found" if result.get("not_found") else "error"
+                status = (
+                    "skipped"
+                    if result.get("failure_streak", 1) >= 2
+                    else "not_found" if result.get("not_found") else "error"
+                )
                 cursor.execute(
                     """
                     UPDATE public.participants
@@ -402,7 +436,22 @@ def write_snapshot(connection: psycopg.Connection, snap_date: date) -> None:
             )
 
 
-def write_batch(database_url: str, results: list[dict[str, object]]) -> None:
+def append_unknown_badges(results: list[dict[str, Any]]) -> None:
+    counts: dict[str, int] = {}
+    for result in results:
+        for name in set(result.get("unknown_badge_names", [])):
+            counts[name] = counts.get(name, 0) + 1
+    if not counts:
+        return
+
+    report = Path(".taste-skill/campaign-resume-unknowns.jsonl")
+    report.parent.mkdir(parents=True, exist_ok=True)
+    with report.open("a", encoding="utf-8") as output:
+        for name, count in sorted(counts.items()):
+            output.write(json.dumps({"name": name, "profiles": count}, ensure_ascii=False) + "\n")
+
+
+def write_batch(database_url: str, results: list[dict[str, Any]]) -> None:
     for retry in range(MAX_DB_RETRIES + 1):
         try:
             with psycopg.connect(database_url) as connection:
@@ -421,7 +470,45 @@ def write_batch(database_url: str, results: list[dict[str, object]]) -> None:
             time.sleep(0.5 * (retry + 1))
 
 
-def result_counts(results: list[dict[str, object]]) -> tuple[int, int, int]:
+def is_pending_status(status: str | None) -> bool:
+    return status not in {"success", "skipped"}
+
+
+def should_write_snapshot(
+    *, only_pending: bool, limit: int | None, pending_count: int, failure_rate: float,
+) -> bool:
+    return (
+        pending_count == 0
+        and (limit is None or only_pending)
+        and failure_rate < 0.30
+    )
+
+
+def campaign_status_counts(connection: psycopg.Connection) -> tuple[int, int, int, int, int]:
+    with connection.cursor() as cursor:
+        cursor.execute(
+            """
+            SELECT count(*)::integer,
+              count(*) FILTER (WHERE scrape_status = 'success')::integer,
+              count(*) FILTER (
+                WHERE scrape_status = 'not_found'
+                  OR (scrape_status = 'skipped' AND last_error LIKE 'HTTP 404%')
+              )::integer,
+              count(*) FILTER (
+                WHERE scrape_status IN ('error', 'skipped')
+                  AND last_error NOT LIKE 'HTTP 404%'
+              )::integer,
+              count(*) FILTER (WHERE scrape_status NOT IN ('success', 'skipped'))::integer
+            FROM public.participants
+            WHERE profile_id IS NOT NULL
+            """
+        )
+        row = cursor.fetchone()
+        assert row is not None
+        return tuple(row)
+
+
+def result_counts(results: list[dict[str, Any]]) -> tuple[int, int, int]:
     ok = sum(bool(result["ok"]) for result in results)
     not_found = sum(
         not bool(result["ok"]) and bool(result.get("not_found"))
@@ -446,10 +533,15 @@ def main() -> int:
         help="fetch one profile and print parsed curriculum badges as JSON",
     )
     parser.add_argument(
+        "--only-pending",
+        action="store_true",
+        help="scrape only rows not yet successful; terminal skipped rows are excluded",
+    )
+    parser.add_argument(
         "--limit",
         type=int,
         metavar="N",
-        help="scrape only the first N participants without writing a snapshot",
+        help="scrape only the first N selected participants",
     )
     args = parser.parse_args()
     if args.limit is not None and args.limit < 1:
@@ -474,7 +566,8 @@ def main() -> int:
                         "SELECT EXISTS (SELECT 1 FROM public.snapshots WHERE snap_date > %s)",
                         (EASTERN_DEADLINE_DATE,),
                     )
-                    final_snapshot_exists = cursor.fetchone()[0]
+                    snapshot_row = cursor.fetchone()
+                    final_snapshot_exists = bool(snapshot_row and snapshot_row[0])
                 if final_snapshot_exists:
                     print("Final campaign snapshot already exists; board data is frozen.")
                     return 0
@@ -487,6 +580,15 @@ def main() -> int:
         )
         return 1
 
+    participants = [
+        participant
+        for participant in participants
+        if (
+            is_pending_status(participant[4])
+            if args.only_pending
+            else participant[4] != "skipped"
+        )
+    ]
     if args.limit is not None:
         participants = participants[: args.limit]
 
@@ -495,7 +597,10 @@ def main() -> int:
     with ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
         for start in range(0, total, BATCH_SIZE):
             batch = participants[start : start + BATCH_SIZE]
-            futures = {executor.submit(scrape_one, participant): participant for participant in batch}
+            futures = {
+                executor.submit(scrape_with_retry, participant): participant
+                for participant in batch
+            }
             results = []
             for future in as_completed(futures):
                 try:
@@ -507,6 +612,11 @@ def main() -> int:
                             "ok": False,
                             "not_found": False,
                             "badges": {},
+                            "unknown_badge_names": [],
+                            "previous_status": futures[future][4],
+                            "failure_streak": (
+                                2 if futures[future][4] in {"error", "not_found"} else 1
+                            ),
                             "error": f"Unexpected scrape error: {type(error).__name__}.",
                         }
                     )
@@ -514,6 +624,7 @@ def main() -> int:
             batch_ok, batch_not_found, batch_errors = result_counts(results)
             try:
                 write_batch(database_url, results)
+                append_unknown_badges(results)
             except Exception as error:
                 processed += len(results)
                 ok_total += batch_ok
@@ -544,18 +655,49 @@ def main() -> int:
                 flush=True,
             )
 
-    failure_rate = (not_found_total + errors_total) / total if total else 0
-    if failure_rate > 0.30:
+    try:
+        with psycopg.connect(database_url) as connection:
+            all_total, campaign_ok, all_not_found, all_errors, pending_count = (
+                campaign_status_counts(connection)
+            )
+    except psycopg.Error as error:
+        print_summary(processed, total, ok_total, not_found_total, errors_total)
+        print(
+            f"ERROR: could not verify final scrape status ({type(error).__name__}).",
+            file=sys.stderr,
+        )
+        return 1
+
+    if args.only_pending and pending_count:
+        print(
+            f"Pending profiles remain: {pending_count}; no snapshot written.",
+            flush=True,
+        )
+        print_summary(processed, total, ok_total, not_found_total, errors_total)
+        return 0
+
+    failure_rate = (all_not_found + all_errors) / all_total if all_total else 0
+    if failure_rate >= 0.30:
         logging.error(
             "%d of %d profiles failed (%.1f%%); no snapshot written.",
-            not_found_total + errors_total,
-            total,
+            all_not_found + all_errors,
+            all_total,
             failure_rate * 100,
         )
         print_summary(processed, total, ok_total, not_found_total, errors_total)
+        print(
+            f"Campaign totals: profiles={all_total}; ok={campaign_ok}; "
+            f"404/private={all_not_found}; errors={all_errors}; pending={pending_count}",
+            flush=True,
+        )
         return 1
 
-    if args.limit is None:
+    if should_write_snapshot(
+        only_pending=args.only_pending,
+        limit=args.limit,
+        pending_count=pending_count,
+        failure_rate=failure_rate,
+    ):
         try:
             with psycopg.connect(database_url) as connection:
                 write_snapshot(connection, datetime.now(IST).date())
@@ -569,6 +711,11 @@ def main() -> int:
         logging.info("Snapshot saved for %s.", datetime.now(IST).date().isoformat())
 
     print_summary(processed, total, ok_total, not_found_total, errors_total)
+    print(
+        f"Campaign totals: profiles={all_total}; ok={campaign_ok}; "
+        f"404/private={all_not_found}; errors={all_errors}; pending={pending_count}",
+        flush=True,
+    )
     return 0
 
 
