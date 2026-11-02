@@ -46,7 +46,7 @@ export default async function HomePage() {
                 <div className="study-cta-row">
                   <a className="study-cta study-primary" href="#milestone-board">Milestone Board <ArrowCircle /></a>
                 </div>
-                <p className="study-deadline"><span className="study-deadline-dot" aria-hidden="true" /><strong>Registration closes 27 Oct, 11:59 PM IST</strong></p>
+                <p className="study-deadline"><span className="study-deadline-dot" aria-hidden="true" /><strong>Complete badges by 23 Nov, 11:59 PM IST</strong></p>
               </div>
               <div className="study-ticket">
                 <div className="study-ticket-main"><span className="study-mono">Referral code</span><span className="study-ticket-code">GDGC-KIIT1</span><span className="study-ticket-note">Enter it on the form to count for KIIT.</span></div>
