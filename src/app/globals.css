@@ -406,9 +406,9 @@ body { background: var(--study-ground); color: var(--study-ink); }
 .study-secondary { background: var(--surface); color: var(--ink); }
 .study-secondary .go { background: var(--blue); color: var(--on-color); }
 .study-secondary:hover { transform: translateY(-2px); }
-.study-hero-deadline { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 10px; margin: 0; color: var(--muted); font-size: .98rem; }
-.study-hero-deadline strong { color: var(--ink); font-family: Outfit, "Segoe UI", system-ui, sans-serif; font-size: 1.05rem; font-weight: 700; }
-.study-deadline-dot { width: 10px; height: 10px; flex: none; border-radius: 50%; background: var(--red); }
+.study-hero-deadline { display: flex; align-items: flex-start; flex-wrap: nowrap; gap: 4px 10px; margin: 0; color: var(--muted); font-size: .98rem; }
+.study-hero-deadline strong { min-width: 0; color: var(--ink); font-family: Outfit, "Segoe UI", system-ui, sans-serif; font-size: 1.05rem; font-weight: 700; }
+.study-deadline-dot { width: 10px; height: 10px; flex: none; margin-top: .45em; border-radius: 50%; background: var(--red); }
 
 .study-section-title { display: flex; flex-direction: column; gap: 6px; margin: 0 0 24px; }
 .study-section-title h2 { margin: 0; font-family: Outfit, "Segoe UI", system-ui, sans-serif; font-size: clamp(1.8rem, 6vw, 2.6rem); font-weight: 800; letter-spacing: -.03em; line-height: 1.05; text-wrap: balance; }
