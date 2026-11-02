@@ -95,7 +95,6 @@ export function AdminLoginForm({
         </form>
 
         <p className="mt-5 border-t-2 border-dashed border-ink/30 pt-4 text-[11px] font-bold leading-relaxed text-ink-soft">
-          Default password is <code className="rounded bg-paper-deep px-1.5 py-0.5">gdg-admin-2026</code>.
           Set the <code className="rounded bg-paper-deep px-1.5 py-0.5">ADMIN_PASSWORD</code> env
           variable to change it.
         </p>
