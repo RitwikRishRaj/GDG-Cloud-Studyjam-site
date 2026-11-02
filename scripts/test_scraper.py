@@ -4,14 +4,18 @@ import unittest
 from datetime import date
 from unittest.mock import MagicMock, patch
 
+import psycopg
+
 from scrape_profiles import (
     CAMPAIGN_START,
     EASTERN_DEADLINE_DATE,
     ProfileError,
     normalize_badge_name,
     parse_profile_badges,
+    result_counts,
     save_result,
     scrape_one,
+    write_batch,
 )
 
 
@@ -49,6 +53,56 @@ class ProfileParserTests(unittest.TestCase):
 
 
 class ScrapeSafetyTests(unittest.TestCase):
+    def test_result_counts_separate_success_not_found_and_errors(self) -> None:
+        results = [
+            {"ok": True},
+            {"ok": False, "not_found": True},
+            {"ok": False, "not_found": False},
+        ]
+
+        self.assertEqual(result_counts(results), (1, 1, 1))
+
+    def test_write_batch_retries_three_times_with_fresh_connections(self) -> None:
+        connection = MagicMock()
+        result = {"participant_id": "participant-id", "ok": False, "not_found": True}
+        with (
+            patch(
+                "scrape_profiles.psycopg.connect",
+                side_effect=[
+                    psycopg.OperationalError(),
+                    psycopg.OperationalError(),
+                    psycopg.OperationalError(),
+                    connection,
+                ],
+            ) as connect,
+            patch("scrape_profiles.save_result") as save,
+            patch("scrape_profiles.time.sleep") as sleep,
+            patch("scrape_profiles.logging.warning"),
+        ):
+            write_batch("configured-db", [result])
+
+        self.assertEqual(connect.call_count, 4)
+        self.assertEqual(sleep.call_count, 3)
+        save.assert_called_once_with(
+            connection.__enter__.return_value,
+            result,
+        )
+        connection.__enter__.return_value.transaction.assert_called_once()
+
+    def test_write_batch_stops_after_three_retries(self) -> None:
+        with (
+            patch(
+                "scrape_profiles.psycopg.connect",
+                side_effect=psycopg.OperationalError(),
+            ) as connect,
+            patch("scrape_profiles.time.sleep"),
+            patch("scrape_profiles.logging.warning"),
+        ):
+            with self.assertRaises(psycopg.OperationalError):
+                write_batch("configured-db", [])
+
+        self.assertEqual(connect.call_count, 4)
+
     def test_prestart_badge_is_stored_but_not_counted(self) -> None:
         connection = MagicMock()
         cursor = connection.cursor.return_value.__enter__.return_value

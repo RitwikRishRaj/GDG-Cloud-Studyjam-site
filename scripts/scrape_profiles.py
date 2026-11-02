@@ -30,6 +30,8 @@ IST = ZoneInfo("Asia/Kolkata")
 CAMPAIGN_START = date(2026, 9, 14)
 EASTERN_DEADLINE_DATE = date(2026, 11, 23)
 MAX_WORKERS = 6
+BATCH_SIZE = 100
+MAX_DB_RETRIES = 3
 USER_AGENT = (
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
     "AppleWebKit/537.36 (KHTML, like Gecko) "
@@ -400,6 +402,42 @@ def write_snapshot(connection: psycopg.Connection, snap_date: date) -> None:
             )
 
 
+def write_batch(database_url: str, results: list[dict[str, object]]) -> None:
+    for retry in range(MAX_DB_RETRIES + 1):
+        try:
+            with psycopg.connect(database_url) as connection:
+                with connection.transaction():
+                    for result in results:
+                        save_result(connection, result)
+            return
+        except (psycopg.OperationalError, psycopg.InterfaceError):
+            if retry == MAX_DB_RETRIES:
+                raise
+            logging.warning(
+                "Database connection failed while saving a batch; retry %d of %d.",
+                retry + 1,
+                MAX_DB_RETRIES,
+            )
+            time.sleep(0.5 * (retry + 1))
+
+
+def result_counts(results: list[dict[str, object]]) -> tuple[int, int, int]:
+    ok = sum(bool(result["ok"]) for result in results)
+    not_found = sum(
+        not bool(result["ok"]) and bool(result.get("not_found"))
+        for result in results
+    )
+    return ok, not_found, len(results) - ok - not_found
+
+
+def print_summary(processed: int, total: int, ok: int, not_found: int, errors: int) -> None:
+    print(
+        f"Final summary: processed={processed}/{total}; ok={ok}; "
+        f"404/private={not_found}; errors={errors}",
+        flush=True,
+    )
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
@@ -428,57 +466,109 @@ def main() -> int:
 
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
     today_ist = datetime.now(IST).date()
-    with psycopg.connect(database_url) as connection:
-        if today_ist > EASTERN_DEADLINE_DATE:
-            with connection.cursor() as cursor:
-                cursor.execute(
-                    "SELECT EXISTS (SELECT 1 FROM public.snapshots WHERE snap_date > %s)",
-                    (EASTERN_DEADLINE_DATE,),
-                )
-                final_snapshot_exists = cursor.fetchone()[0]
-            if final_snapshot_exists:
-                print("Final campaign snapshot already exists; board data is frozen.")
-                return 0
+    try:
+        with psycopg.connect(database_url) as connection:
+            if today_ist > EASTERN_DEADLINE_DATE:
+                with connection.cursor() as cursor:
+                    cursor.execute(
+                        "SELECT EXISTS (SELECT 1 FROM public.snapshots WHERE snap_date > %s)",
+                        (EASTERN_DEADLINE_DATE,),
+                    )
+                    final_snapshot_exists = cursor.fetchone()[0]
+                if final_snapshot_exists:
+                    print("Final campaign snapshot already exists; board data is frozen.")
+                    return 0
 
-        participants = load_participants(connection)
-        if args.limit is not None:
-            participants = participants[: args.limit]
-        results = []
-        with ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
-            futures = [executor.submit(scrape_one, participant) for participant in participants]
+            participants = load_participants(connection)
+    except psycopg.Error as error:
+        print(
+            f"ERROR: could not load participants ({type(error).__name__}).",
+            file=sys.stderr,
+        )
+        return 1
+
+    if args.limit is not None:
+        participants = participants[: args.limit]
+
+    total = len(participants)
+    processed = ok_total = not_found_total = errors_total = 0
+    with ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
+        for start in range(0, total, BATCH_SIZE):
+            batch = participants[start : start + BATCH_SIZE]
+            futures = {executor.submit(scrape_one, participant): participant for participant in batch}
+            results = []
             for future in as_completed(futures):
-                results.append(future.result())
+                try:
+                    results.append(future.result())
+                except Exception as error:
+                    results.append(
+                        {
+                            "participant_id": futures[future][0],
+                            "ok": False,
+                            "not_found": False,
+                            "badges": {},
+                            "error": f"Unexpected scrape error: {type(error).__name__}.",
+                        }
+                    )
 
-        failures = 0
-        for result in results:
-            save_result(connection, result)
-            if not result["ok"]:
-                failures += 1
+            batch_ok, batch_not_found, batch_errors = result_counts(results)
+            try:
+                write_batch(database_url, results)
+            except Exception as error:
+                processed += len(results)
+                ok_total += batch_ok
+                not_found_total += batch_not_found
+                errors_total += batch_errors
+                print(
+                    f"Progress: {processed}/{total} processed; batch write failed; "
+                    f"cumulative ok={ok_total}, 404/private={not_found_total}, "
+                    f"errors={errors_total}",
+                    flush=True,
+                )
+                print_summary(processed, total, ok_total, not_found_total, errors_total)
+                print(
+                    f"ERROR: batch write failed ({type(error).__name__}); no snapshot written.",
+                    file=sys.stderr,
+                )
+                return 1
 
-        failure_rate = failures / len(participants) if participants else 0
-        if failure_rate > 0.30:
-            logging.error(
-                "%d of %d profiles failed (%.1f%%); no snapshot written.",
-                failures,
-                len(participants),
-                failure_rate * 100,
+            processed += len(results)
+            ok_total += batch_ok
+            not_found_total += batch_not_found
+            errors_total += batch_errors
+            print(
+                f"Progress: {processed}/{total} processed; "
+                f"batch ok={batch_ok}, 404/private={batch_not_found}, errors={batch_errors}; "
+                f"cumulative ok={ok_total}, 404/private={not_found_total}, "
+                f"errors={errors_total}",
+                flush=True,
+            )
+
+    failure_rate = (not_found_total + errors_total) / total if total else 0
+    if failure_rate > 0.30:
+        logging.error(
+            "%d of %d profiles failed (%.1f%%); no snapshot written.",
+            not_found_total + errors_total,
+            total,
+            failure_rate * 100,
+        )
+        print_summary(processed, total, ok_total, not_found_total, errors_total)
+        return 1
+
+    if args.limit is None:
+        try:
+            with psycopg.connect(database_url) as connection:
+                write_snapshot(connection, datetime.now(IST).date())
+        except psycopg.Error as error:
+            print_summary(processed, total, ok_total, not_found_total, errors_total)
+            print(
+                f"ERROR: snapshot write failed ({type(error).__name__}).",
+                file=sys.stderr,
             )
             return 1
+        logging.info("Snapshot saved for %s.", datetime.now(IST).date().isoformat())
 
-        if args.limit is None:
-            write_snapshot(connection, datetime.now(IST).date())
-            logging.info(
-                "Scraped %d profiles; %d failed; snapshot saved for %s.",
-                len(participants),
-                failures,
-                datetime.now(IST).date().isoformat(),
-            )
-        else:
-            logging.info(
-                "Scraped %d profiles; %d failed; no snapshot written for limited run.",
-                len(participants),
-                failures,
-            )
+    print_summary(processed, total, ok_total, not_found_total, errors_total)
     return 0
 
 
