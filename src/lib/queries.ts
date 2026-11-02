@@ -6,16 +6,6 @@ import type { SheetConfig } from "@/lib/sheets";
 
 export const BADGE_TARGET = 15;
 
-export async function getLeaderboard() {
-  return db
-    .select()
-    .from(participants)
-    .orderBy(
-      desc(participants.badgeCount),
-      sql`${participants.lastBadgeDate} ASC NULLS LAST`,
-      asc(participants.name)
-    );
-}
 
 export async function getStats() {
   const [row] = await db

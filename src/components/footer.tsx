@@ -11,8 +11,8 @@ export function Footer() {
         Run by students, open to every branch, free since 2017.
       </p>
       <p className="study-local-links">
-        <Link href="/leaderboard">
-          Badge leaderboard <ArrowUpRight aria-hidden="true" />
+        <Link href="/#milestone-board">
+          Milestone Board <ArrowUpRight aria-hidden="true" />
         </Link>
         <Link href="/admin">
           Admin <ArrowUpRight aria-hidden="true" />

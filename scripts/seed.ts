@@ -1,7 +1,9 @@
-import "dotenv/config";
-import { seedIfEmpty } from "../src/lib/demo-data";
+import { config } from "dotenv";
+
+config({ path: ".env.local" });
 
 async function main() {
+  const { seedIfEmpty } = await import("../src/lib/demo-data");
   const force = process.argv.includes("--force");
   const inserted = await seedIfEmpty(force);
   console.log(

@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { ClipboardList, MessageCircle } from "lucide-react";
+import { ClipboardList } from "lucide-react";
+import { WhatsAppIcon } from "@/components/whatsapp-icon";
 
 type StudyMastheadProps = {
   page: "home" | "leaderboard";
@@ -45,26 +46,27 @@ export function StudyMasthead({ page }: StudyMastheadProps) {
       {page === "home" ? (
         <nav className="study-nav" aria-label="Page sections">
           <a
+            className="study-nav-syllabus"
             href="https://goo.gle/lwc-student-curriculum"
             target="_blank"
             rel="noopener noreferrer"
           >
             Syllabus
           </a>
-          <a href="#registration">
+          <Link href="/#milestone-board" className="study-nav-milestone">
             <ClipboardList aria-hidden="true" />
-            How to register
-          </a>
-          <a href="#help">
-            <MessageCircle aria-hidden="true" />
+            Milestone Board
+          </Link>
+          <a href="#help" className="study-nav-whatsapp">
+            <WhatsAppIcon />
             WhatsApp
           </a>
         </nav>
       ) : (
         <nav className="study-nav" aria-label="Main navigation">
           <Link href="/">Home</Link>
-          <Link href="/leaderboard" aria-current="page">
-            Leaderboard
+          <Link href="/#milestone-board" aria-current="page">
+            Milestone Board
           </Link>
           <Link href="/admin">Admin</Link>
         </nav>
