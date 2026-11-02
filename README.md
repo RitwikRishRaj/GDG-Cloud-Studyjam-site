@@ -12,7 +12,7 @@ Current database consumers:
 - `src/lib/demo-data.ts` contains the existing optional demo seed path.
 - `src/app/api/admin/**` and `src/app/admin/**` use the existing participant, settings, and sync tables. Their UI and routes remain unchanged.
 - `scripts/seed.ts`, `drizzle.config.ts`, and `src/db/schema.ts` support the existing Drizzle database.
-- Public homepage data is read only from `public.milestone_board` and `public.milestone_stats` by `src/lib/milestone-data.ts`.
+- Public homepage data is read only from `public.milestone_board` and `public.milestone_stats` by `src/lib/milestone-data.ts`. The homepage uses 24-hour ISR, and its data is kept in Next.js's persistent cache and refreshed after the nightly scrape; visitors receive the cached page rather than querying Supabase.
 
 The milestone schema retains the legacy columns needed by `/admin`, and adds `profile_id`, sheet metadata, scrape state, `badges`, `completions`, and `snapshots`. The importer updates legacy `badge_count` for the unchanged admin display; the public board derives its counts and dates from curriculum completions.
 
@@ -91,7 +91,13 @@ python scripts/test_import_participants.py
 
 ## GitHub Actions and secrets
 
-The workflow at `.github/workflows/nightly-scrape.yml` runs at `0 20 * * *` UTC (01:30 IST) and supports `workflow_dispatch`. In the repository's Actions secrets, add `DATABASE_URL` with the Supabase session-mode pooler connection string. Do not add CSVs, `.env` files, anon keys, or passwords to the repository. To add a second daily run, add one more `- cron: "..."` item under `schedule`.
+The workflow at `.github/workflows/nightly-scrape.yml` runs daily at 01:00 `Asia/Kolkata` and supports `workflow_dispatch` (the workflow must be on the default branch for scheduled and manual triggers). GitHub schedules are best-effort and may start late. In repository Actions settings, configure:
+
+- Secret `DATABASE_URL`: Supabase session-mode pooler connection string.
+- Secret `SNAPSHOT_REVALIDATE_SECRET`: a long random value; set the same value in Vercel Preview environment variables.
+- Variable `SNAPSHOT_REVALIDATE_URL`: the stable Vercel Preview URL ending in `/api/revalidate/milestone-board`.
+
+After a successful scrape, the workflow invalidates and warms the public leaderboard cache. If either revalidation setting is missing, the workflow stops before scraping rather than silently leaving stale data. Do not add CSVs, `.env` files, anon keys, or passwords to the repository.
 
 For local anon-key checks, put `SUPABASE_URL` and either the legacy `SUPABASE_ANON_KEY` or the public `SUPABASE_PUBLISHABLE_KEY` (or the corresponding `NEXT_PUBLIC_` variable) in the ignored `.env.local`, then run:
 
@@ -104,6 +110,6 @@ The script requests zero rows from every base table, requires 401/403 denials, a
 ## Vercel deployment
 
 1. Apply and verify the Supabase migration and import/scrape data first.
-2. Configure `DATABASE_URL`, `ADMIN_PASSWORD`, and `ADMIN_SESSION_SECRET` in Vercel **Preview** environment variables. Admin access fails closed unless both admin variables are configured.
+2. Configure `DATABASE_URL`, `ADMIN_PASSWORD`, `ADMIN_SESSION_SECRET`, and `SNAPSHOT_REVALIDATE_SECRET` in Vercel **Preview** environment variables. Admin access fails closed unless both admin variables are configured. Keep the revalidation secret out of `NEXT_PUBLIC_*` variables.
 3. Deploy this branch as a Preview and check `/`, `/#milestone-board`, `/leaderboard` (redirect), and `/admin`. Do not promote or change Production before approval.
 4. To roll back the Preview, restore its previous database environment and redeploy a build compatible with that database. Keep the Docker source database until final verification.

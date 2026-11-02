@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { adminGuard } from "@/lib/api-guard";
 import { seedIfEmpty } from "@/lib/demo-data";
+import { invalidateMilestoneData } from "@/lib/milestone-data";
 
 export async function POST(req: NextRequest) {
   if (process.env.NODE_ENV === "production") {
@@ -21,6 +22,7 @@ export async function POST(req: NextRequest) {
     );
   }
 
+  invalidateMilestoneData();
   return NextResponse.json({
     ok: true,
     inserted,

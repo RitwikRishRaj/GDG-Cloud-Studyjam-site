@@ -10,6 +10,7 @@ from scrape_profiles import (
     CAMPAIGN_START,
     EASTERN_DEADLINE_DATE,
     ProfileError,
+    campaign_status_counts,
     is_pending_status,
     normalize_badge_name,
     parse_profile_badges,
@@ -115,6 +116,16 @@ class ScrapeSafetyTests(unittest.TestCase):
 
         self.assertEqual(result_counts(results), (1, 1, 1))
 
+    def test_campaign_status_counts_treats_null_status_as_pending(self) -> None:
+        connection = MagicMock()
+        cursor = connection.cursor.return_value.__enter__.return_value
+        cursor.fetchone.return_value = (4, 2, 0, 0, 2)
+
+        self.assertEqual(campaign_status_counts(connection), (4, 2, 0, 0, 2))
+        query = cursor.execute.call_args.args[0]
+        self.assertIn("scrape_status IS DISTINCT FROM 'success'", query)
+        self.assertIn("scrape_status IS DISTINCT FROM 'skipped'", query)
+
     def test_write_batch_retries_three_times_with_fresh_connections(self) -> None:
         connection = MagicMock()
         result = {"participant_id": "participant-id", "ok": False, "not_found": True}
@@ -130,7 +141,7 @@ class ScrapeSafetyTests(unittest.TestCase):
             ) as connect,
             patch("scrape_profiles.save_result") as save,
             patch("scrape_profiles.time.sleep") as sleep,
-            patch("scrape_profiles.logging.warning"),
+            patch("scrape_profiles.logger.warning"),
         ):
             write_batch("configured-db", [result])
 
@@ -149,7 +160,7 @@ class ScrapeSafetyTests(unittest.TestCase):
                 side_effect=psycopg.OperationalError(),
             ) as connect,
             patch("scrape_profiles.time.sleep"),
-            patch("scrape_profiles.logging.warning"),
+            patch("scrape_profiles.logger.warning"),
         ):
             with self.assertRaises(psycopg.OperationalError):
                 write_batch("configured-db", [])

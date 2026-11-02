@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { adminGuard } from "@/lib/api-guard";
 import { getSheetConfig, saveSheetConfig } from "@/lib/queries";
 import { syncFromGoogleSheet, sanitizeConfig } from "@/lib/sheets";
+import { invalidateMilestoneData } from "@/lib/milestone-data";
 
 export async function POST(req: NextRequest) {
   const guard = await adminGuard(req);
@@ -28,6 +29,7 @@ export async function POST(req: NextRequest) {
       );
     }
     const result = await syncFromGoogleSheet(config);
+    if (result.status === "success") invalidateMilestoneData();
     return NextResponse.json({ ok: result.status === "success", result });
   } catch (err) {
     return NextResponse.json(
