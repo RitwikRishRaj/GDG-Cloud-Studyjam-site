@@ -5,14 +5,22 @@
 }
 
 .countdownHeader {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 16px 24px;
   padding: 24px;
   border: 2px solid var(--ink);
   border-radius: 20px;
   background: var(--surface);
   box-shadow: 0 5px 0 var(--ink);
+}
+
+.countdownCopy {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 8px;
 }
 
 .countdownHeading {
@@ -31,11 +39,28 @@
   font-size: .76rem;
 }
 
+.deadline strong {
+  color: var(--ink);
+  font-weight: 700;
+}
+
+.boardDisclaimer {
+  margin: 0;
+}
+
+.countdownGroup {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
+}
+
 .countdown {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 10px;
-  width: min(100%, 560px);
+  gap: 8px;
+  width: min(100%, 380px);
 }
 
 .countdownUnit {
@@ -44,41 +69,53 @@
   flex-direction: column;
   align-items: center;
   gap: 4px;
-  padding: 10px 6px;
-  border: 1.5px solid var(--line);
-  border-radius: 14px;
-  background: var(--bg);
+  padding: 9px 6px;
+  border: 2px solid var(--ink);
+  border-radius: 13px;
+  box-shadow: 3px 3px 0 var(--ink);
 }
+
+.countdownUnit:nth-child(1) { background: var(--blue); color: var(--on-color); }
+.countdownUnit:nth-child(2) { background: var(--red); color: var(--on-color); }
+.countdownUnit:nth-child(3) { background: var(--yellow); color: var(--on-yellow); }
+.countdownUnit:nth-child(4) { background: var(--green); color: var(--on-color); }
 
 .countdownValue {
   font-family: Outfit, "Segoe UI", system-ui, sans-serif;
-  font-size: clamp(1.6rem, 6vw, 2.5rem);
+  font-size: clamp(1.35rem, 4vw, 2rem);
   font-variant-numeric: tabular-nums;
-  font-weight: 700;
+  font-weight: 800;
   letter-spacing: -.05em;
   line-height: 1;
 }
 
 .countdownLabel {
-  color: var(--muted);
   font-family: "JetBrains Mono", ui-monospace, monospace;
-  font-size: .62rem;
-  letter-spacing: .06em;
+  font-size: .58rem;
+  letter-spacing: .04em;
   text-transform: uppercase;
+}
+
+.finalDay .countdownUnit {
+  background: var(--red);
+  color: var(--on-color);
+  animation: finalDayPulse 2.8s cubic-bezier(.4, 0, .2, 1) infinite;
+}
+
+@keyframes finalDayPulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.025); }
 }
 
 .countdownEnded {
   width: fit-content;
   margin: 0;
-  padding: 10px 14px;
-  border: 1.5px solid var(--ink);
-  border-radius: 12px;
-  background: var(--highlight);
+  padding: 9px 14px;
+  border: 1.5px solid var(--line);
+  border-radius: 999px;
+  background: var(--line);
+  color: var(--muted);
   font-weight: 700;
-}
-
-.curriculumLink {
-  width: fit-content;
 }
 
 .stats {
@@ -97,7 +134,8 @@
   padding: 20px;
   border: 2px solid var(--ink);
   border-radius: 20px;
-  background: var(--surface);
+  background: var(--milestone-tint, var(--surface));
+  box-shadow: 0 5px 0 var(--ink);
 }
 
 .participantTotal strong {
@@ -109,14 +147,16 @@
 }
 
 .participantTotal > span:last-child,
-.statHeading > div > span {
+.statHeading > div > span,
+.statHeading > div > strong {
   color: var(--muted);
   font-size: .78rem;
+  font-weight: 800;
 }
 
 .statHeading {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
   gap: 8px;
 }
@@ -129,37 +169,32 @@
 }
 
 .statHeading > strong {
+  display: grid;
+  min-width: 56px;
+  min-height: 56px;
+  padding: 4px 8px;
+  place-items: center;
+  border: 2px solid var(--ink);
+  border-radius: 14px;
+  background: var(--milestone-accent, var(--highlight));
+  box-shadow: 3px 3px 0 var(--ink);
+  color: var(--milestone-count-ink, var(--ink));
   font-family: Outfit, "Segoe UI", system-ui, sans-serif;
   font-size: 1.5rem;
   font-variant-numeric: tabular-nums;
+  font-weight: 800;
   line-height: 1;
 }
 
-.progressTrack {
-  overflow: hidden;
-  height: 10px;
-  border: 1px solid var(--line);
-  border-radius: 999px;
-  background: var(--bg);
-}
-
-.progressFill {
-  display: block;
-  height: 100%;
-  border-radius: inherit;
-}
-
-.one { background: var(--blue); }
-.two { background: var(--yellow); }
-.three { background: var(--green); }
+.one { --milestone-tint: var(--tint-blue); --milestone-accent: var(--blue); --milestone-count-ink: var(--on-color); }
+.two { --milestone-tint: var(--highlight); --milestone-accent: var(--yellow); --milestone-count-ink: var(--on-yellow); }
+.three { --milestone-tint: var(--tint-green); --milestone-accent: var(--green); --milestone-count-ink: var(--on-color); }
 
 .statFoot {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
   margin: 0;
   color: var(--muted);
-  font-size: .72rem;
+  font-size: .76rem;
+  font-weight: 800;
   line-height: 1.4;
 }
 
@@ -290,7 +325,9 @@
 }
 
 @media (max-width: 760px) {
-  .countdownHeader { padding: 20px; }
+  .countdownHeader { grid-template-columns: minmax(0, 1fr); padding: 20px; }
+  .countdownGroup { align-items: stretch; }
+  .countdown { width: 100%; max-width: none; }
   .stats { grid-template-columns: minmax(0, 1fr); }
   .participantTotal,
   .statCard { padding: 18px; }
@@ -331,5 +368,5 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .progressFill { transition: none; }
+  .finalDay .countdownUnit { animation: none; }
 }

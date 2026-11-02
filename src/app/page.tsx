@@ -1,7 +1,7 @@
 import Link from "next/link";
-import { ArrowRight, ArrowUpRight, ClipboardList, MessageCircle } from "lucide-react";
-import { CopyReferralButton } from "@/components/copy-referral";
+import { ArrowRight, ArrowUpRight, ClipboardList } from "lucide-react";
 import { StudyMasthead } from "@/components/study-masthead";
+import { WhatsAppIcon } from "@/components/whatsapp-icon";
 import { MilestoneBoard, MilestoneStats } from "@/components/leaderboard";
 import { MilestoneCountdown } from "@/components/milestone-countdown";
 import milestoneStyles from "@/components/milestone-board.module.css";
@@ -11,11 +11,12 @@ import { CAMPAIGN_DEADLINE } from "@/lib/campaign";
 
 const syllabusUrl = "https://goo.gle/lwc-student-curriculum";
 const guideUrl = "https://docs.google.com/document/d/1_V1v-Ii9QBzF9bTK_InE4670H12n5Te36DTjuEoz9gs/edit?tab=t.0#heading=h.e1a2o8y6pljb";
-const whatsappUrl = "https://chat.whatsapp.com/CHeebKrkCyv89bXo64vBS3";
+const whatsappUrl = "https://chat.whatsapp.com/LObHVtOYsP78cQP3NwHR4h";
 
 function ArrowCircle({ className = "" }: { className?: string }) {
   return <span className={`go ${className}`} aria-hidden="true"><ArrowRight /></span>;
 }
+
 
 export const dynamic = "force-dynamic";
 
@@ -42,30 +43,28 @@ export default async function HomePage() {
             <p className="study-lead">Do free, hands-on Google Cloud labs on Google Skills. <strong>5 skill badges</strong> get you a Google Cloud water bottle. <strong>10</strong> unlock an exclusive developer kit with a T-shirt. Every badge also goes on your resume and LinkedIn.</p>
             <div className="study-actions">
               <div className="study-cta-block">
-                <div className="study-notice"><span className="study-bang" aria-hidden="true">!</span><p><strong>Read the <a href={guideUrl} target="_blank" rel="noopener noreferrer">guide</a> first. It is important.</strong> Most rejected applications come from a skipped step.</p></div>
+                <div className="study-notice"><span className="study-bang" aria-hidden="true">!</span><p><strong>Follow the provided curriculum</strong> and complete the <strong>designated skill badges</strong> to stay on track with the programme.</p></div>
                 <div className="study-cta-row">
                   <a className="study-cta study-primary" href="#milestone-board">Milestone Board <ArrowCircle /></a>
+                  <a className="study-cta study-secondary" href={syllabusUrl} target="_blank" rel="noopener noreferrer">
+                    Open curriculum <ArrowCircle />
+                  </a>
                 </div>
-                <p className="study-deadline"><span className="study-deadline-dot" aria-hidden="true" /><strong>Complete badges by 23 Nov, 11:59 PM IST</strong></p>
-              </div>
-              <div className="study-ticket">
-                <div className="study-ticket-main"><span className="study-mono">Referral code</span><span className="study-ticket-code">GDGC-KIIT1</span><span className="study-ticket-note">Enter it on the form to count for KIIT.</span></div>
-                <CopyReferralButton className="study-ticket-copy" />
+                <p className="study-hero-deadline"><span className="study-deadline-dot" aria-hidden="true" /><strong>Complete badges by 23 Nov, 11:59 PM IST</strong></p>
               </div>
             </div>
           </section>
 
           <section id="milestone-board" className={milestoneStyles.section} aria-labelledby="milestone-title">
+            <p className={`${milestoneStyles.footnote} ${milestoneStyles.boardDisclaimer}`}>
+              This board isn’t the final result. Rewards are limited and subject to Google’s campaign rules. T&Cs apply
+            </p>
             <div className={milestoneStyles.countdownHeader}>
-              <span className="study-mono">Campaign deadline</span>
-              <h2 id="milestone-title" className={milestoneStyles.countdownHeading}>Milestone Board</h2>
-              <p className={milestoneStyles.deadline}>{CAMPAIGN_DEADLINE.label}</p>
+              <div className={milestoneStyles.countdownCopy}>
+                <h2 id="milestone-title" className={milestoneStyles.countdownHeading}>Milestone Board</h2>
+                <p className={milestoneStyles.deadline}><strong>{CAMPAIGN_DEADLINE.label}</strong></p>
+              </div>
               <MilestoneCountdown />
-            </div>
-            <div className={milestoneStyles.curriculumLink}>
-              <a className="study-cta study-secondary" href={syllabusUrl} target="_blank" rel="noopener noreferrer">
-                Open curriculum <ArrowCircle />
-              </a>
             </div>
             {milestoneData ? (
               <MilestoneStats stats={milestoneData.stats} />
@@ -110,13 +109,21 @@ export default async function HomePage() {
 
           <section className="study-important" aria-labelledby="important-title">
             <h2 id="important-title">Important:</h2>
-            <ul><li>All badges in the official syllabus are mandatory.</li><li>Only listed badges count.</li><li className="study-important-deadline">Deadline: 23rd November (no extensions!)</li></ul>
+            <ul>
+              <li>All skill badges listed in the document are mandatory.</li>
+              <li>Labs or skill badges completed outside this list will not count toward Google Cloud Learn with Communities.</li>
+              <li>Completing additional, non-listed badges may use your allocated credits. Extra credits cannot be provided.</li>
+              <li>The campaign deadline is 23 November. Complete all listed labs and skill badges before then.</li>
+              <li>Since the access pass remains valid only until the end of the campaign, the deadline cannot be extended.</li>
+              <li>Use credits only for the courses listed here. If your credits run out before you finish the required labs, the team cannot provide additional credits.</li>
+              <li>This board isn’t the final result. Rewards are limited and subject to Google’s campaign rules. T&Cs apply.</li>
+            </ul>
           </section>
 
           <section id="help" className="study-help" aria-labelledby="help-title">
             <div className="study-after"><span className="study-mono">After you submit</span><p>A copy of your response lands in your inbox. Once your registration is confirmed, the campaign says the Google Cloud team emails you an <strong>access code</strong> for free lab credits. Submitting does not guarantee a place.</p></div>
             <div className="study-help-banner">
-              <span className="study-help-icon"><MessageCircle aria-hidden="true" /></span>
+              <span className="study-help-icon study-whatsapp-icon"><WhatsAppIcon /></span>
               <div><h2 id="help-title">Stuck? Ask us in the WhatsApp group.</h2><p>Post your question and an organiser from <strong>GDG on Campus KIIT</strong> will answer.</p></div>
               <a className="study-cta study-primary" href={whatsappUrl} target="_blank" rel="noopener noreferrer">Join the group <ArrowCircle /></a>
             </div>

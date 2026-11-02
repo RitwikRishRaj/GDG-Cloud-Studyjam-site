@@ -31,6 +31,7 @@ export function MilestoneCountdown() {
   }
 
   const remaining = now === null ? null : Math.ceil((deadline - now) / 1_000);
+  const finalDay = remaining !== null && remaining <= 86_400;
   const values = units.map(([label, seconds, modulus]) => {
     if (remaining === null) return [label, "--"] as const;
     const value = Math.floor(
@@ -40,21 +41,24 @@ export function MilestoneCountdown() {
   });
 
   return (
-    <div
-      className={styles.countdown}
-      role="timer"
-      aria-label={
-        now === null
-          ? "Countdown to 23 November 2026 at 11:59 PM India time"
-          : values.map(([label, value]) => `${value} ${label}`).join(", ")
-      }
-    >
-      {values.map(([label, value]) => (
-        <div className={styles.countdownUnit} key={label}>
-          <span className={styles.countdownValue}>{value}</span>
-          <span className={styles.countdownLabel}>{label}</span>
-        </div>
-      ))}
+    <div className={styles.countdownGroup}>
+      <span className="study-mono">{finalDay ? "Final day" : "Campaign deadline"}</span>
+      <div
+        className={`${styles.countdown} ${finalDay ? styles.finalDay : ""}`}
+        role="timer"
+        aria-label={
+          now === null
+            ? "Countdown to 23 November 2026 at 11:59 PM India time"
+            : values.map(([label, value]) => `${value} ${label}`).join(", ")
+        }
+      >
+        {values.map(([label, value]) => (
+          <div className={styles.countdownUnit} key={label}>
+            <span className={styles.countdownValue}>{value}</span>
+            <span className={styles.countdownLabel}>{label}</span>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }

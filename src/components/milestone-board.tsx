@@ -79,38 +79,21 @@ export function MilestoneStats({ stats }: { stats: MilestoneStats }) {
         <strong>{total.toLocaleString("en-IN")}</strong>
         <span>registered profiles</span>
       </article>
-      {milestones.map((milestone) => {
-        const percent = total > 0 ? Math.round((milestone.count / total) * 100) : 0;
-        return (
-          <article className={styles.statCard} key={milestone.label}>
-            <div className={styles.statHeading}>
-              <div>
-                <h3>{milestone.label}</h3>
-                <span>{milestone.requirement}</span>
-              </div>
-              <strong>{milestone.count.toLocaleString("en-IN")}</strong>
+      {milestones.map((milestone) => (
+        <article
+          className={`${styles.statCard} ${styles[milestone.color]}`}
+          key={milestone.label}
+        >
+          <div className={styles.statHeading}>
+            <div>
+              <h3>{milestone.label}</h3>
+              <strong>{milestone.requirement}</strong>
             </div>
-            <div
-              className={styles.progressTrack}
-              role="progressbar"
-              aria-label={`${milestone.label} progress`}
-              aria-valuemin={0}
-              aria-valuemax={100}
-              aria-valuenow={percent}
-              aria-valuetext={`${milestone.count} of ${total} participants, ${percent}%`}
-            >
-              <span
-                className={`${styles.progressFill} ${styles[milestone.color]}`}
-                style={{ width: `${percent}%` }}
-              />
-            </div>
-            <p className={styles.statFoot}>
-              <span>{percent}% of participants</span>
-              <span>{milestone.note}</span>
-            </p>
-          </article>
-        );
-      })}
+            <strong>{milestone.count.toLocaleString("en-IN")}</strong>
+          </div>
+          <p className={styles.statFoot}><strong>{milestone.note}</strong></p>
+        </article>
+      ))}
     </div>
   );
 }
@@ -202,7 +185,6 @@ export function MilestoneBoard({
                 <td className={`${styles.rankCell} ${styles.cell}`}>
                   <span
                     className="study-row-rank"
-                    data-rank={row.rank <= 3 ? row.rank : undefined}
                     role="img"
                     aria-label={`Rank ${row.rank}`}
                   >
