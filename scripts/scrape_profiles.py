@@ -265,10 +265,22 @@ def dump_profile(url: str) -> int:
 
 def load_participants(
     connection: psycopg.Connection,
+    only: str | None = None,
 ) -> list[tuple[str, str, str, int, str | None]]:
+    """Load participants; `only` limits to one by email, profile UUID, row id or profile URL."""
+    selector_sql = ""
+    selector_params: tuple[str, ...] = ()
+    if only:
+        key = only.strip()
+        tail = key.rstrip("/").rsplit("/", 1)[-1]
+        selector_sql = (
+            "AND (lower(p.email) = lower(%s) OR p.id::text = %s "
+            "OR p.profile_id::text = %s OR p.profile_url = %s)"
+        )
+        selector_params = (key, tail, tail, key)
     with connection.cursor() as cursor:
         cursor.execute(
-            """
+            f"""
             SELECT p.id::text, p.profile_id::text, p.profile_url,
               count(c.badge_id) FILTER (
                 WHERE c.earned_on >= %s AND c.earned_on <= %s
@@ -278,6 +290,7 @@ def load_participants(
             LEFT JOIN public.completions AS c ON c.participant_id = p.id
             LEFT JOIN public.badges AS b ON b.id = c.badge_id
             WHERE p.profile_id IS NOT NULL
+            {selector_sql}
             GROUP BY p.id
             ORDER BY p.id
             """,
@@ -285,6 +298,7 @@ def load_participants(
                 CAMPAIGN_START,
                 EASTERN_DEADLINE_DATE,
                 list(CURRICULUM_BY_NAME),
+                *selector_params,
             ),
         )
         rows = cursor.fetchall()
@@ -294,7 +308,11 @@ def load_participants(
     ]
 
 
-def save_result(connection: psycopg.Connection, result: dict[str, Any]) -> None:
+def save_result(
+    connection: psycopg.Connection,
+    result: dict[str, Any],
+    keep_timestamps: bool = False,
+) -> None:
     participant_id = str(result["participant_id"])
     with connection.transaction():
         with connection.cursor() as cursor:
@@ -337,7 +355,7 @@ def save_result(connection: psycopg.Connection, result: dict[str, Any]) -> None:
             cursor.execute(
                 """
                 UPDATE public.participants AS p
-                SET scrape_status = 'success', last_scraped_at = now(), last_error = NULL,
+                SET scrape_status = 'success', last_scraped_at = {scraped_at}, last_error = NULL,
                     badge_count = COALESCE((
                       SELECT count(*)::integer
                       FROM public.completions AS c
@@ -365,9 +383,12 @@ def save_result(connection: psycopg.Connection, result: dict[str, Any]) -> None:
                         AND c.earned_on >= %s AND c.earned_on <= %s
                         AND b.norm_name = ANY(%s)
                     ), '[]'::jsonb),
-                    updated_at = now()
+                    updated_at = {updated_at}
                 WHERE p.id = %s
-                """,
+                """.format(
+                    scraped_at="p.last_scraped_at" if keep_timestamps else "now()",
+                    updated_at="p.updated_at" if keep_timestamps else "now()",
+                ),
                 (
                     CAMPAIGN_START,
                     EASTERN_DEADLINE_DATE,
@@ -452,12 +473,17 @@ def append_unknown_badges(results: list[dict[str, Any]]) -> None:
             output.write(json.dumps({"name": name, "profiles": count}, ensure_ascii=False) + "\n")
 
 
-def write_batch(database_url: str, results: list[dict[str, Any]]) -> None:
+def write_batch(
+    database_url: str, results: list[dict[str, Any]], keep_timestamps: bool = False
+) -> None:
     for retry in range(MAX_DB_RETRIES + 1):
         try:
             with psycopg.connect(database_url) as connection, connection.transaction():
                 for result in results:
-                    save_result(connection, result)
+                    if keep_timestamps:
+                        save_result(connection, result, keep_timestamps=True)
+                    else:
+                        save_result(connection, result)
             return
         except (psycopg.OperationalError, psycopg.InterfaceError):
             if retry == MAX_DB_RETRIES:
@@ -546,7 +572,20 @@ def main() -> int:
         metavar="N",
         help="scrape only the first N selected participants",
     )
+    parser.add_argument(
+        "--only",
+        metavar="ID",
+        help="scrape just one participant: email, profile UUID, row id or profile URL",
+    )
+    parser.add_argument(
+        "--keep-timestamps",
+        action="store_true",
+        help="leave last_scraped_at/updated_at untouched so the site's 'last updated' "
+        "time does not change",
+    )
     args = parser.parse_args()
+    if args.only and args.limit is not None:
+        parser.error("--only cannot be combined with --limit.")
     if args.limit is not None and args.limit < 1:
         parser.error("--limit must be a positive integer.")
     if args.dump:
@@ -577,7 +616,7 @@ def main() -> int:
                     print("Final campaign snapshot already exists; board data is frozen.")
                     return 0
 
-            participants = load_participants(connection)
+            participants = load_participants(connection, args.only)
     except psycopg.Error as error:
         print(
             f"ERROR: could not load participants ({type(error).__name__}).",
@@ -585,10 +624,13 @@ def main() -> int:
         )
         return 1
 
+    if args.only and not participants:
+        print("ERROR: no participant matched --only.", file=sys.stderr)
+        return 1
     participants = [
         participant
         for participant in participants
-        if (
+        if args.only or (
             is_pending_status(participant[4])
             if args.only_pending
             else participant[4] != "skipped"
@@ -629,7 +671,7 @@ def main() -> int:
 
             batch_ok, batch_not_found, batch_errors = result_counts(results)
             try:
-                write_batch(database_url, results)
+                write_batch(database_url, results, args.keep_timestamps)
             except (psycopg.Error, ProfileError) as error:
                 processed += len(results)
                 ok_total += batch_ok
@@ -680,6 +722,11 @@ def main() -> int:
             file=sys.stderr,
         )
         return 1
+
+    if args.only:
+        print_summary(processed, total, ok_total, not_found_total, errors_total)
+        print("Single-profile run: no snapshot written.", flush=True)
+        return 0 if ok_total else 1
 
     if args.only_pending and pending_count:
         print(
