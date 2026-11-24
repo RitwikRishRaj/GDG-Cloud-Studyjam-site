@@ -583,7 +583,22 @@ def main() -> int:
         help="leave last_scraped_at/updated_at untouched so the site's 'last updated' "
         "time does not change",
     )
+    parser.add_argument(
+        "--snapshot",
+        action="store_true",
+        help="with --only: also rebuild today's leaderboard snapshot after the scrape",
+    )
+    parser.add_argument(
+        "--revalidate",
+        action="store_true",
+        help="with --snapshot: refresh the cached leaderboard using "
+        "SNAPSHOT_REVALIDATE_URL and SNAPSHOT_REVALIDATE_SECRET",
+    )
     args = parser.parse_args()
+    if args.snapshot and not args.only:
+        parser.error("--snapshot is only for --only runs; full runs write it automatically.")
+    if args.revalidate and not args.snapshot:
+        parser.error("--revalidate requires --snapshot.")
     if args.only and args.limit is not None:
         parser.error("--only cannot be combined with --limit.")
     if args.limit is not None and args.limit < 1:
@@ -725,8 +740,43 @@ def main() -> int:
 
     if args.only:
         print_summary(processed, total, ok_total, not_found_total, errors_total)
-        print("Single-profile run: no snapshot written.", flush=True)
-        return 0 if ok_total else 1
+        if not ok_total:
+            return 1
+        if not args.snapshot:
+            print("Single-profile run: no snapshot written.", flush=True)
+            return 0
+        try:
+            with psycopg.connect(database_url) as connection:
+                write_snapshot(connection, datetime.now(IST).date())
+        except psycopg.Error as error:
+            print(
+                f"ERROR: snapshot write failed ({type(error).__name__}).",
+                file=sys.stderr,
+            )
+            return 1
+        print(f"Snapshot saved for {datetime.now(IST).date().isoformat()}.", flush=True)
+        if args.revalidate:
+            url = os.environ.get("SNAPSHOT_REVALIDATE_URL")
+            secret = os.environ.get("SNAPSHOT_REVALIDATE_SECRET")
+            if not url or not secret:
+                print(
+                    "ERROR: SNAPSHOT_REVALIDATE_URL and SNAPSHOT_REVALIDATE_SECRET are required.",
+                    file=sys.stderr,
+                )
+                return 1
+            try:
+                response = requests.post(
+                    url, headers={"Authorization": f"Bearer {secret}"}, timeout=60
+                )
+                response.raise_for_status()
+            except requests.RequestException as error:
+                print(
+                    f"ERROR: leaderboard refresh failed ({type(error).__name__}).",
+                    file=sys.stderr,
+                )
+                return 1
+            print("Leaderboard cache refreshed.", flush=True)
+        return 0
 
     if args.only_pending and pending_count:
         print(
