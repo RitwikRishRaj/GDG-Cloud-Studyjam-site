@@ -54,12 +54,28 @@ CURRICULUM = [
 ]
 
 
+# Participants flagged developer_track in the database are counted against this list.
+DEVELOPER_CURRICULUM = [
+    "The Basics of Google Cloud Compute",
+    "Configure Service Accounts and IAM Roles for Google Cloud",
+    "Implement Speech and Language Solutions with Pre-trained APIs",
+    "Develop AI-Powered Prototypes in Google AI Studio",
+    "Analyze Images with the Cloud Vision API",
+    "Prompt Design in Agent Platform",
+    "Explore Generative AI in Agent Platform",
+    "Create Your First Gemini Enterprise Application",
+    "Orchestrate Multi-agent Workflows with Gemini Enterprise",
+    "Google DeepMind: Train A Small Language Model",
+]
+
+
 def normalize_badge_name(name: str) -> str:
     tokens = re.findall(r"[a-z0-9]+", name.lower())
     return " ".join("ai" if token == "al" else token for token in tokens)
 
 
 CURRICULUM_BY_NAME = {normalize_badge_name(name): name for name in CURRICULUM}
+DEVELOPER_NORM_NAMES = [normalize_badge_name(name) for name in DEVELOPER_CURRICULUM]
 
 
 class ProfileError(Exception):
@@ -417,8 +433,12 @@ def write_snapshot(connection: psycopg.Connection, snap_date: date) -> None:
                     ) AS badge_ordinal
                   FROM public.completions AS c
                   JOIN public.badges AS b ON b.id = c.badge_id
+                  JOIN public.participants AS pp ON pp.id = c.participant_id
                   WHERE c.earned_on >= %s AND c.earned_on <= %s
-                    AND b.norm_name = ANY(%s)
+                    AND (
+                      (NOT pp.developer_track AND b.norm_name = ANY(%s))
+                      OR (pp.developer_track AND b.norm_name = ANY(%s))
+                    )
                 ),
                 counts AS (
                   SELECT participant_id, count(*)::integer AS badge_count,
@@ -454,7 +474,13 @@ def write_snapshot(connection: psycopg.Connection, snap_date: date) -> None:
                   badge_count = EXCLUDED.badge_count,
                   rank = EXCLUDED.rank
             """,
-            (CAMPAIGN_START, EASTERN_DEADLINE_DATE, curriculum_names, snap_date),
+            (
+                CAMPAIGN_START,
+                EASTERN_DEADLINE_DATE,
+                curriculum_names,
+                DEVELOPER_NORM_NAMES,
+                snap_date,
+            ),
         )
 
 
