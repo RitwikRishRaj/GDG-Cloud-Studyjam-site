@@ -620,7 +620,14 @@ def main() -> int:
         help="with --snapshot: refresh the cached leaderboard using "
         "SNAPSHOT_REVALIDATE_URL and SNAPSHOT_REVALIDATE_SECRET",
     )
+    parser.add_argument(
+        "--allow-frozen",
+        action="store_true",
+        help="with --only: run even though the final campaign snapshot already exists",
+    )
     args = parser.parse_args()
+    if args.allow_frozen and not args.only:
+        parser.error("--allow-frozen is only for --only runs.")
     if args.snapshot and not args.only:
         parser.error("--snapshot is only for --only runs; full runs write it automatically.")
     if args.revalidate and not args.snapshot:
@@ -645,7 +652,7 @@ def main() -> int:
     today_ist = datetime.now(IST).date()
     try:
         with psycopg.connect(database_url) as connection:
-            if today_ist > EASTERN_DEADLINE_DATE:
+            if today_ist > EASTERN_DEADLINE_DATE and not args.allow_frozen:
                 with connection.cursor() as cursor:
                     cursor.execute(
                         "SELECT EXISTS (SELECT 1 FROM public.snapshots WHERE snap_date > %s)",
